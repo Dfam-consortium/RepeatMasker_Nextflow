@@ -122,12 +122,14 @@ if ( params.cluster == "local" ) {
   thisExecutor = "local"
   thisQueue = ""
   thisOptions = ""
+  thisAdjOptions = ""
   thisScratch = false
 }else if ( params.cluster == "quanah" || params.cluster == "nocona" ){
   proc = 12
   thisExecutor = "slurm"
   thisQueue = params.cluster
   thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc}"
+  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
   ucscToolsDir="/lustre/work/daray/software/ucscTools"
   repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
   thisScratch = false
@@ -138,6 +140,7 @@ if ( params.cluster == "local" ) {
   thisQueue = "wheeler_lab_large_cpu"
   thisOptions = "--tasks=1 --cpus-per-task=${proc}"
   ucscToolsDir="/home/rh105648e/ucscTools"
+  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
   //repeatMaskerDir="/home/rh105648e/RepeatMasker-4.1.1"
   //repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4.0.9p2"
   repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
@@ -251,7 +254,7 @@ process RepeatMasker {
 process combineRMOUTOutput {
   executor = thisExecutor
   queue = thisQueue
-  clusterOptions = thisOptions
+  clusterOptions = thisAdjOptions
   scratch = thisScratch
 
   publishDir "${outputDir}", mode: 'copy'
@@ -274,12 +277,12 @@ process combineRMOUTOutput {
   """
 }
 
-/* TODO: Sort Align file...and do we need to reconcile identifiers? */
+/* TODO: Reconcile identifiers */
 
 process combineRMAlignOutput {
   executor = thisExecutor
   queue = thisQueue
-  clusterOptions = thisOptions
+  clusterOptions = thisAdjOptions
   scratch = thisScratch
 
   publishDir "${outputDir}", mode: 'copy'
@@ -293,7 +296,8 @@ process combineRMAlignOutput {
   script:
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
-  gzip -c combAlign > ${twoBitFile.baseName}.rmalign.gz
+  ${workflow.projectDir}/alignToBed.pl combAlign | ${ucscToolsDir}/sortBed stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
+  gzip -c combAlign-sorted > ${twoBitFile.baseName}.rmalign.gz
   """
 }
 
