@@ -66,14 +66,16 @@ params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Default software dependencies ( see localizations in cluster sections )
 version = "0.8"
-ucscToolsDir="/usr/local/ucscTools"
-repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
+//ucscToolsDir="/usr/local/ucscTools"
+//repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
+ucscToolsDir="/lustre/work/daray/software/ucscTools"
+repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
 
 // process params
 batchSize = params.batchSize
 inputSequence = "undefined"
 if ( params.inputSequenceDir != "undefined" ) {
-  inSeqFiles = Channel.fromPath(params.inputSequenceDir + "/*")
+  inSeqFiles = Channel.fromPath(params.inputSequenceDir + "/*").view()
 }else {
   inputSequence = params.inputSequence
   if ( params.inputSequence == "${workflow.projectDir}/sample/example1-seq.fa" )
@@ -200,7 +202,7 @@ process genBatches {
 
   input:
   path(warmuplog) from done_warmup_chan
-  file(inSeqFile) from inSeqFiles
+  each file(inSeqFile) from inSeqFiles
 
   output:
   tuple file("${inSeqFile.baseName}.2bit"), file("batch*.bed") into batchChan 
@@ -246,6 +248,7 @@ process RepeatMasker {
   ${repeatMaskerDir}/RepeatMasker -pa 12 -a ${otherOptions} ${libOpt} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
   ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.out 
   ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.align
+  cp ${batch_file.baseName}.fa.out ${batch_file.baseName}.fa.out.unadjusted
   mv ${batch_file.baseName}.fa.out.adjusted ${batch_file.baseName}.fa.out
   mv ${batch_file.baseName}.fa.align.adjusted ${batch_file.baseName}.fa.align
   """
@@ -296,7 +299,7 @@ process combineRMAlignOutput {
   script:
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
-  ${workflow.projectDir}/alignToBed.pl combAlign | ${ucscToolsDir}/sortBed stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
+  ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
   gzip -c combAlign-sorted > ${twoBitFile.baseName}.rmalign.gz
   """
 }

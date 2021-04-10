@@ -3,8 +3,8 @@ use strict;
 use Data::Dumper;
 
 # Where this script can find liftUp, twoBitInfo and twoBitToFa 
-#my $ucscBinDir = "/lustre/work/daray/software/ucscTools";
-my $ucscBinDir = "/usr/local/ucscTools";
+my $ucscBinDir = "/lustre/work/daray/software/ucscTools";
+#my $ucscBinDir = "/usr/local/ucscTools";
 
 
 my $seqFile = $ARGV[0];

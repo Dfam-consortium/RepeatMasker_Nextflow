@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use Data::Dumper;
-#use lib "/lustre/work/daray/software/RepeatMasker";
-use lib "/usr/local/RepeatMasker";
+use lib "/lustre/work/daray/software/RepeatMasker";
+#use lib "/usr/local/RepeatMasker";
 use SearchResult;
 use SearchResultCollection;
 use CrossmatchSearchEngine;
