@@ -65,11 +65,11 @@ params.inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
 params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Default software dependencies ( see localizations in cluster sections )
-version = "0.8"
-//ucscToolsDir="/usr/local/ucscTools"
-//repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
-ucscToolsDir="/lustre/work/daray/software/ucscTools"
-repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
+version = "0.9"
+ucscToolsDir="/usr/local/ucscTools"
+repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
+//ucscToolsDir="/lustre/work/daray/software/ucscTools"
+//repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
 
 // process params
 batchSize = params.batchSize
@@ -220,6 +220,7 @@ process genBatches {
   fi  
  
   # This can magically accept FASTA, Gzip'd FASTA, or 2BIT...but 2Bit is prob. fastest
+  export UCSCTOOLSDIR=${ucscToolsDir}
   ${workflow.projectDir}/genBEDBatches.pl ${inSeqFile.baseName}.2bit ${batchSize}
   """
 }
@@ -246,6 +247,7 @@ process RepeatMasker {
   #
   ${ucscToolsDir}/twoBitToFa -bed=${batch_file} ${inSeqTwoBitFile} ${batch_file.baseName}.fa
   ${repeatMaskerDir}/RepeatMasker -pa 12 -a ${otherOptions} ${libOpt} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
+  export REPEATMASKER_DIR=${repeatMaskerDir}
   ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.out 
   ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.align
   cp ${batch_file.baseName}.fa.out ${batch_file.baseName}.fa.out.unadjusted
@@ -275,6 +277,7 @@ process combineRMOUTOutput {
   echo "   SW   perc perc perc  query     position in query    matching          repeat       position in repeat" > combOutSorted
   echo "score   div. del. ins.  sequence  begin end   (left)   repeat            class/family begin  end    (left)  ID" >> combOutSorted
   grep -v -e "^\$" combOut | sort -k5,5 -k6,6n -T ${workflow.workDir} >> combOutSorted
+  export PATH=${ucscToolsDir}/\$PATH
   ${repeatMaskerDir}/util/buildSummary.pl -genome ${twoBitFile} -useAbsoluteGenomeSize combOutSorted > ${twoBitFile.baseName}.summary
   gzip -c combOutSorted > ${twoBitFile.baseName}.rmout.gz
   """
