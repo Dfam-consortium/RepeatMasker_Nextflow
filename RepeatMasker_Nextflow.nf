@@ -65,11 +65,13 @@ params.inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
 params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Default software dependencies ( see localizations in cluster sections )
-version = "0.8"
+version = "0.9"
 //ucscToolsDir="/usr/local/ucscTools"
 //repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
 ucscToolsDir="/lustre/work/daray/software/ucscTools"
-repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
+//repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
+repeatMaskerDir="/home/rhubley/RepeatMasker-4.1.2p1-df36"
+//repeatMaskerDir="/home/rhubley/RepeatMasker-412p1-newthresh-human"
 
 // process params
 batchSize = params.batchSize
@@ -130,8 +132,9 @@ if ( params.cluster == "local" ) {
   proc = 12
   thisExecutor = "slurm"
   thisQueue = params.cluster
-  thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc}"
-  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
+  // In the past I had to exclude 26-51
+  thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc} --exclude=cpu-24-31"
+  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2 --exclude=cpu-24-31"
   ucscToolsDir="/lustre/work/daray/software/ucscTools"
   repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
   thisScratch = false
@@ -300,6 +303,10 @@ process combineRMAlignOutput {
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
   ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
+  /home/rhubley/RepeatMasker_Nextflow/alignToBed.pl -fullAlign combAlign > tmp.bed
+  # Be mindful of this buffer size...should probably make this a parameter
+  sort -k1,1V -k2,2n -k3,3nr -S 3G -T ${workflow.workDir} tmp.bed > tmp.bed.sorted
+  /home/rhubley/RepeatMasker_Nextflow/bedToAlign.pl tmp.bed.sorted > combAlign-sorted
   gzip -c combAlign-sorted > ${twoBitFile.baseName}.rmalign.gz
   """
 }
