@@ -2,10 +2,12 @@
 use strict;
 use Data::Dumper;
 
-# Where this script can find liftUp, twoBitInfo and twoBitToFa 
-my $ucscBinDir = "/lustre/work/daray/software/ucscTools";
-#my $ucscBinDir = "/usr/local/ucscTools";
-
+# Where this script can find twoBitInfo 
+my $ucscBinDir = "";
+if ( -d $ENV{'UCSCTOOLSDIR'} && -s $ENV{'UCSCTOOLSDIR'} . "/twoBitInfo" ) {
+  $ucscBinDir = $ENV{'UCSCTOOLSDIR'};
+  $ucscBinDir .= "/" if ( $ucscBinDir !~ /^.*\/$/ );
+}
 
 my $seqFile = $ARGV[0];
 my $maxSize = $ARGV[1];
@@ -49,8 +51,8 @@ sub getBatches {
   my @seqList = ();
 
   if ( $seqFile =~ /.*\.2bit$/ ) {
-    open IN, "$ucscBinDir/twoBitInfo $seqFile stdout|"
-      or die "Could not run $ucscBinDir/twoBitInfo on $seqFile!\n";
+    open IN, "$ucscBinDir" . "twoBitInfo $seqFile stdout|"
+      or die "Could not run $ucscBinDir" . "twoBitInfo on $seqFile!\n";
     while ( <IN> )
     {
       if ( /^(\S+)\s+(\d+)/ )

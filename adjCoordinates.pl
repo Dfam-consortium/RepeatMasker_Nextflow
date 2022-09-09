@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use Data::Dumper;
-use lib "/lustre/work/daray/software/RepeatMasker";
-#use lib "/usr/local/RepeatMasker";
+# NOTE: This is set by the Nextflow script prior to invocation
+use lib $ENV{'REPEATMASKER_DIR'};
 use SearchResult;
 use SearchResultCollection;
 use CrossmatchSearchEngine;
