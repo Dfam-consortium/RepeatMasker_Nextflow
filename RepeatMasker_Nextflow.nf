@@ -66,12 +66,8 @@ params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Default software dependencies ( see localizations in cluster sections )
 version = "0.9"
-//ucscToolsDir="/usr/local/ucscTools"
-//repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
-ucscToolsDir="/lustre/work/daray/software/ucscTools"
-//repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
-repeatMaskerDir="/home/rhubley/RepeatMasker-4.1.2p1-df36"
-//repeatMaskerDir="/home/rhubley/RepeatMasker-412p1-newthresh-human"
+ucscToolsDir="/opt/ucsc_tools"
+repeatMaskerDir="/opt/RepeatMasker"
 
 // process params
 batchSize = params.batchSize
@@ -169,6 +165,14 @@ if ( params.cluster == "local" ) {
   repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
   //repeatMaskerDir="/home/rh105648e/RepeatMasker-4.1.0-rmb290"
   thisScratch = "/state/partition1"
+} else if ( params.cluster == "puma" ) {
+  thisExecutor = "slurm"
+  thisOptions = "--ntasks=1 --cpus-per-task=${proc} --partition=windfall --time=08:00:00"
+  thisAdjOptions = "--ntasks=1 --cpus-per-task=2 --partition=windfall --time=08:00:00"
+  ucscToolsDir="/opt/ucsc_tools"
+  repeatMaskerDir="/opt/RepeatMasker"
+  thisQueue = ""
+  thisScratch = "/tmp"
 }
 
 log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
@@ -197,6 +201,10 @@ log.info "\n"
 
 
 process warmupRepeatMasker {
+  executor = thisExecutor
+  queue = thisQueue
+  clusterOptions = thisOptions
+  scratch = thisScratch
 
   input:
   path(small_seq) from warmup_chan
@@ -299,7 +307,7 @@ process combineRMOUTOutput {
   echo "   SW   perc perc perc  query     position in query    matching          repeat       position in repeat" > combOutSorted
   echo "score   div. del. ins.  sequence  begin end   (left)   repeat            class/family begin  end    (left)  ID" >> combOutSorted
   grep -v -e "^\$" combOut | sort -k5,5 -k6,6n -T ${workflow.workDir} >> combOutSorted
-  export PATH=${ucscToolsDir}/\$PATH
+  export PATH=${ucscToolsDir}:/\$PATH
   ${repeatMaskerDir}/util/buildSummary.pl -genome ${twoBitFile} -useAbsoluteGenomeSize combOutSorted > ${twoBitFile.baseName}.summary
   gzip -c combOutSorted > ${twoBitFile.baseName}.rmout.gz
   """
@@ -325,10 +333,10 @@ process combineRMAlignOutput {
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
   ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
-  /home/rhubley/RepeatMasker_Nextflow/alignToBed.pl -fullAlign combAlign > tmp.bed
+  ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign > tmp.bed
   # Be mindful of this buffer size...should probably make this a parameter
   sort -k1,1V -k2,2n -k3,3nr -S 3G -T ${workflow.workDir} tmp.bed > tmp.bed.sorted
-  /home/rhubley/RepeatMasker_Nextflow/bedToAlign.pl tmp.bed.sorted > combAlign-sorted
+  ${workflow.projectDir}/bedToAlign.pl tmp.bed.sorted > combAlign-sorted
   gzip -c combAlign-sorted > ${twoBitFile.baseName}.rmalign.gz
   """
 }

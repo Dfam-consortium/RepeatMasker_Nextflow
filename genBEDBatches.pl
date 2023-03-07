@@ -3,7 +3,7 @@ use strict;
 use Data::Dumper;
 
 # Where this script can find twoBitInfo 
-my $ucscBinDir = "";
+my $ucscBinDir = "/opt/ucsc_tools";
 if ( -d $ENV{'UCSCTOOLSDIR'} && -s $ENV{'UCSCTOOLSDIR'} . "/twoBitInfo" ) {
   $ucscBinDir = $ENV{'UCSCTOOLSDIR'};
   $ucscBinDir .= "/" if ( $ucscBinDir !~ /^.*\/$/ );
