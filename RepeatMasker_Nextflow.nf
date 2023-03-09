@@ -158,21 +158,18 @@ if ( params.cluster == "local" ) {
   //thisQueue = "wheeler_lab_small_cpu"
   thisQueue = "wheeler_lab_large_cpu"
   thisOptions = "--tasks=1 --cpus-per-task=${proc}"
-  ucscToolsDir="/home/rh105648e/ucscTools"
+  ucscToolsDir="/opt/ucscTools"
   thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
-  //repeatMaskerDir="/home/rh105648e/RepeatMasker-4.1.1"
-  //repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4.0.9p2"
-  repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
-  //repeatMaskerDir="/home/rh105648e/RepeatMasker-4.1.0-rmb290"
+  repeatMaskerDir="/opt/RepeatMasker/RepeatMasker"
   thisScratch = "/state/partition1"
 } else if ( params.cluster == "puma" ) {
   thisExecutor = "slurm"
-  thisOptions = "--ntasks=1 --cpus-per-task=${proc} --partition=windfall --time=08:00:00"
-  thisAdjOptions = "--ntasks=1 --cpus-per-task=2 --partition=windfall --time=08:00:00"
+  thisOptions = "--ntasks=1 --cpus-per-task=12 --partition=windfall --time=08:00:00"
+  thisAdjOptions = "--ntasks=1 --cpus-per-task=1 --partition=windfall --time=08:00:00"
   ucscToolsDir="/opt/ucsc_tools"
   repeatMaskerDir="/opt/RepeatMasker"
   thisQueue = ""
-  thisScratch = "/tmp"
+  thisScratch = false
 }
 
 log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
@@ -205,7 +202,9 @@ process warmupRepeatMasker {
   queue = thisQueue
   clusterOptions = thisOptions
   scratch = thisScratch
-
+  errorStrategy "retry"
+  maxRetries 3
+  
   input:
   path(small_seq) from warmup_chan
 
@@ -229,6 +228,8 @@ process genBatches {
   queue = thisQueue
   clusterOptions = thisOptions
   scratch = thisScratch
+  errorStrategy "retry"
+  maxRetries 3
 
   input:
   path(warmuplog) from done_warmup_chan
@@ -260,6 +261,8 @@ process RepeatMasker {
   queue = thisQueue
   clusterOptions = thisOptions
   scratch = thisScratch
+  errorStrategy "retry"
+  maxRetries 3
 
   input:
   file inLibFile from opt_libFile
@@ -291,8 +294,10 @@ process combineRMOUTOutput {
   queue = thisQueue
   clusterOptions = thisAdjOptions
   scratch = thisScratch
+  errorStrategy "retry"
+  maxRetries 3
 
-  publishDir "${outputDir}", mode: 'copy'
+  publishDir "${outputDir}", mode: 'copy', overwrite: true
 
   input:
   tuple file(twoBitFile), file(outfiles) from rmoutChan.map { tb, outf -> [ tb.toRealPath(), outf ]}.groupTuple()
@@ -320,8 +325,10 @@ process combineRMAlignOutput {
   queue = thisQueue
   clusterOptions = thisAdjOptions
   scratch = thisScratch
-
-  publishDir "${outputDir}", mode: 'copy'
+  errorStrategy "retry"
+  maxRetries 3
+  
+  publishDir "${outputDir}", mode: 'copy', overwrite: true
 
   input:
   tuple file(twoBitFile), file(alignfiles) from rmalignChan.map { tb, alignf -> [ tb.toRealPath(), alignf ]}.groupTuple()
