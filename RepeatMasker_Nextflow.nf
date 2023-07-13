@@ -51,6 +51,12 @@ RepeatMasker_Nextflow : Run RepeatMasker on a cluster
 Robert Hubley, 3/2020
 */
 
+// Check Nextflow Version
+if( !nextflow.version.matches('21.0+') ) {
+    println "This workflow requires Nextflow version 21.0 or greater -- You are running version $nextflow.version"
+    exit 1
+}
+
 // Defaults
 params.cluster = "local"
 params.outputDir = "undefined"
@@ -138,15 +144,11 @@ if ( params.cluster == "local" ) {
 }else if ( params.cluster == "griz" ) {
   proc = 12
   thisExecutor = "slurm"
-  //thisQueue = "wheeler_lab_small_cpu"
   thisQueue = "wheeler_lab_large_cpu"
   thisOptions = "--tasks=1 --cpus-per-task=${proc}"
   ucscToolsDir="/home/rh105648e/ucscTools"
   thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
-  //repeatMaskerDir="/home/rh105648e/RepeatMasker-4.1.1"
-  //repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4.0.9p2"
   repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
-  //repeatMaskerDir="/home/rh105648e/RepeatMasker-4.1.0-rmb290"
   thisScratch = "/state/partition1"
 }
 
