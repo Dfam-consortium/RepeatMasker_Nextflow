@@ -72,10 +72,12 @@ params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Default software dependencies ( see localizations in cluster sections )
 version = "0.9"
-ucscToolsDir="/usr/local/ucscTools"
-repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
-//ucscToolsDir="/lustre/work/daray/software/ucscTools"
+//ucscToolsDir="/usr/local/ucscTools"
+//repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
+ucscToolsDir="/lustre/work/daray/software/ucscTools"
 //repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
+repeatMaskerDir="/home/rhubley/RepeatMasker-4.1.2p1-df36"
+//repeatMaskerDir="/home/rhubley/RepeatMasker-412p1-newthresh-human"
 
 // process params
 batchSize = params.batchSize
@@ -106,11 +108,28 @@ if ( params.species != "NO_SPECIES" ) {
 }
 opt_libFile = file(libFile)
 
+//
+// RM uses the pa param to specify how many parallel search processes
+// to run.  Each search engine uses it's own internal threading so to
+// calculate the # of processors to allocate you need to know which
+// engine is being used:
+//      RMBlast:  4 cpus per invocation
+//      nhmmer:   2 cpus per invocation
+//
+// Default in case we don't recognize the engine below
+cpus_per_pa = 1
+// Defult number of parallel batches we expect to run
+pa_param = 12
+
 otherOptions = ""
 if ( params.engine != "undefined" ) {
   otherOptions += " -engine " + params.engine
+  if ( params.engine == "hmmer" ) {
+    cpus_per_pa = 2
+  }
 }else {
   otherOptions += " -engine rmblast"
+  cpus_per_pa = 4
 }
 if ( params.nolow != "undefined" ) {
   otherOptions += " -nolow"
@@ -121,6 +140,9 @@ if ( params.s != "undefined" ) {
 if ( params.xsmall != "undefined" ) {
   otherOptions += " -xsmall"
 }
+
+// Proc to allocate
+proc = pa_param * cpus_per_pa
 
 //
 // Setup executor for different environments, particularly 
@@ -133,16 +155,15 @@ if ( params.cluster == "local" ) {
   thisAdjOptions = ""
   thisScratch = false
 }else if ( params.cluster == "quanah" || params.cluster == "nocona" ){
-  proc = 12
   thisExecutor = "slurm"
   thisQueue = params.cluster
-  thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc}"
-  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
+  // In the past I had to exclude 26-51
+  thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc} --exclude=cpu-23-1"
+  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2 --exclude=cpu-23-1"
   ucscToolsDir="/lustre/work/daray/software/ucscTools"
   repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
   thisScratch = false
 }else if ( params.cluster == "griz" ) {
-  proc = 12
   thisExecutor = "slurm"
   thisQueue = "wheeler_lab_large_cpu"
   thisOptions = "--tasks=1 --cpus-per-task=${proc}"
@@ -192,6 +213,7 @@ process warmupRepeatMasker {
   # force it to initialize the cached libraries.  Do not want to do this on the
   # cluster ( in parallel ) as it may cause each job to attempt the build at once.
   #
+  hostname > node
   ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${small_seq.baseName}.fa >& ${small_seq.baseName}.rmlog
   """
 }
@@ -248,7 +270,7 @@ process RepeatMasker {
   # Run RepeatMasker and readjust coordinates
   #
   ${ucscToolsDir}/twoBitToFa -bed=${batch_file} ${inSeqTwoBitFile} ${batch_file.baseName}.fa
-  ${repeatMaskerDir}/RepeatMasker -pa 12 -a ${otherOptions} ${libOpt} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
+  ${repeatMaskerDir}/RepeatMasker -pa ${pa_param} -a ${otherOptions} ${libOpt} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
   export REPEATMASKER_DIR=${repeatMaskerDir}
   ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.out 
   ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.align
@@ -305,6 +327,10 @@ process combineRMAlignOutput {
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
   ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
+  /home/rhubley/RepeatMasker_Nextflow/alignToBed.pl -fullAlign combAlign > tmp.bed
+  # Be mindful of this buffer size...should probably make this a parameter
+  sort -k1,1V -k2,2n -k3,3nr -S 3G -T ${workflow.workDir} tmp.bed > tmp.bed.sorted
+  /home/rhubley/RepeatMasker_Nextflow/bedToAlign.pl tmp.bed.sorted > combAlign-sorted
   gzip -c combAlign-sorted > ${twoBitFile.baseName}.rmalign.gz
   """
 }
