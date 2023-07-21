@@ -43,6 +43,13 @@ for ( my $i = 0 ; $i < $resultCollection->size() ; $i++ ) {
   }else {
     die "Could not find $qID in BED file!\n";
   }
+
+  # Make it easier for the Nextflow script to merge identifiers between batches
+  # Nextflow batches will look like this
+  if ( $resultFile =~ /batch-(\d+)\.fa\.(align|out)/ ) {
+    # This will make the identifier unique when batches are concatenated
+    $result->setId("b" . $1 . "_" . $result->getId());
+  }
  
   if ( $qSeq ) { 
     print OUT "" . $result->toStringFormatted( SearchResult::AlignWithQuerySeq );

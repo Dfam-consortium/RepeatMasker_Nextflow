@@ -52,8 +52,8 @@ Robert Hubley, 3/2020
 */
 
 // Check Nextflow Version
-if( !nextflow.version.matches('21.0+') ) {
-    println "This workflow requires Nextflow version 21.0 or greater -- You are running version $nextflow.version"
+if( ! (nextflow.version.matches('21.0+') || nextflow.version.matches('22.0+')) ) {
+    println "This workflow requires Nextflow version 21 or 22 -- You are running version $nextflow.version"
     exit 1
 }
 
@@ -71,12 +71,12 @@ params.inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
 params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Default software dependencies ( see localizations in cluster sections )
-version = "0.9"
-//ucscToolsDir="/usr/local/ucscTools"
-//repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
-ucscToolsDir="/lustre/work/daray/software/ucscTools"
+version = "1.0"
+ucscToolsDir="/usr/local/ucscTools"
+repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
+//ucscToolsDir="/lustre/work/daray/software/ucscTools"
 //repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
-repeatMaskerDir="/home/rhubley/RepeatMasker-4.1.2p1-df36"
+//repeatMaskerDir="/home/rhubley/RepeatMasker-4.1.2p1-df36"
 //repeatMaskerDir="/home/rhubley/RepeatMasker-412p1-newthresh-human"
 
 // process params
@@ -86,7 +86,7 @@ if ( params.inputSequenceDir != "undefined" ) {
   inSeqFiles = Channel.fromPath(params.inputSequenceDir + "/*").view()
 }else {
   inputSequence = params.inputSequence
-  if ( params.inputSequence == "${workflow.projectDir}/sample/example1-seq.fa" )
+  if ( params.inputSequence == "${workflow.projectDir}/sample/example1-seq.fa.gz" )
   {
     // Lower default batch size for example
     batchSize = 10000
@@ -140,7 +140,6 @@ if ( params.s != "undefined" ) {
 if ( params.xsmall != "undefined" ) {
   otherOptions += " -xsmall"
 }
-
 // Proc to allocate
 proc = pa_param * cpus_per_pa
 
@@ -148,21 +147,23 @@ proc = pa_param * cpus_per_pa
 // Setup executor for different environments, particularly 
 // well-known-environments.
 //
+// No cluster...just local execution
 if ( params.cluster == "local" ) {
   thisExecutor = "local"
   thisQueue = ""
   thisOptions = ""
   thisAdjOptions = ""
   thisScratch = false
+// TTU Cluster
 }else if ( params.cluster == "quanah" || params.cluster == "nocona" ){
   thisExecutor = "slurm"
   thisQueue = params.cluster
-  // In the past I had to exclude 26-51
   thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc} --exclude=cpu-23-1"
   thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2 --exclude=cpu-23-1"
   ucscToolsDir="/lustre/work/daray/software/ucscTools"
   repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
   thisScratch = false
+// UMT Griz Cluster
 }else if ( params.cluster == "griz" ) {
   thisExecutor = "slurm"
   thisQueue = "wheeler_lab_large_cpu"
@@ -172,6 +173,8 @@ if ( params.cluster == "local" ) {
   repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
   thisScratch = "/state/partition1"
 }
+
+
 
 log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
 log.info "===================================================================="
@@ -294,6 +297,7 @@ process combineRMOUTOutput {
   output:
   file("*.rmout.gz")
   file("*.summary")
+  file("combOutSorted-translation.tsv") into rmAlignTransChan
   
   script:
   """
@@ -301,13 +305,13 @@ process combineRMOUTOutput {
   echo "   SW   perc perc perc  query     position in query    matching          repeat       position in repeat" > combOutSorted
   echo "score   div. del. ins.  sequence  begin end   (left)   repeat            class/family begin  end    (left)  ID" >> combOutSorted
   grep -v -e "^\$" combOut | sort -k5,5 -k6,6n -T ${workflow.workDir} >> combOutSorted
+  ${workflow.projectDir}/renumberIDs.pl combOutSorted > combOutSortedRenumbered
+  mv translation-out.tsv combOutSorted-translation.tsv
   export PATH=${ucscToolsDir}/\$PATH
-  ${repeatMaskerDir}/util/buildSummary.pl -genome ${twoBitFile} -useAbsoluteGenomeSize combOutSorted > ${twoBitFile.baseName}.summary
-  gzip -c combOutSorted > ${twoBitFile.baseName}.rmout.gz
+  ${repeatMaskerDir}/util/buildSummary.pl -genome ${twoBitFile} -useAbsoluteGenomeSize combOutSortedRenumbered > ${twoBitFile.baseName}.summary
+  gzip -c combOutSortedRenumbered > ${twoBitFile.baseName}.rmout.gz
   """
 }
-
-/* TODO: Reconcile identifiers */
 
 process combineRMAlignOutput {
   executor = thisExecutor
@@ -319,6 +323,7 @@ process combineRMAlignOutput {
 
   input:
   tuple file(twoBitFile), file(alignfiles) from rmalignChan.map { tb, alignf -> [ tb.toRealPath(), alignf ]}.groupTuple()
+  file transFile from rmAlignTransChan
   
   output:
   file("*.rmalign.gz")
@@ -327,11 +332,12 @@ process combineRMAlignOutput {
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
   ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
-  /home/rhubley/RepeatMasker_Nextflow/alignToBed.pl -fullAlign combAlign > tmp.bed
+  ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign > tmp.bed
   # Be mindful of this buffer size...should probably make this a parameter
   sort -k1,1V -k2,2n -k3,3nr -S 3G -T ${workflow.workDir} tmp.bed > tmp.bed.sorted
-  /home/rhubley/RepeatMasker_Nextflow/bedToAlign.pl tmp.bed.sorted > combAlign-sorted
-  gzip -c combAlign-sorted > ${twoBitFile.baseName}.rmalign.gz
+  ${workflow.projectDir}/bedToAlign.pl tmp.bed.sorted > combAlign-sorted
+  ${workflow.projectDir}/renumberIDs.pl -translation ${transFile} combAlign-sorted > combAlign-sorted-renumbered
+  gzip -c combAlign-sorted-renumbered > ${twoBitFile.baseName}.rmalign.gz
   """
 }
 
