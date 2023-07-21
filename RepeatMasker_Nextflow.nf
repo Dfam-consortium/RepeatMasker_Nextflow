@@ -70,14 +70,17 @@ params.inputSequenceDir = "undefined"
 params.inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
 params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
-// Default software dependencies ( see localizations in cluster sections )
+// Workflow version
 version = "1.0"
+
+///////
+/////// CUSTOMIZE DEPENDENCIES HERE 
+///////
+// Directory to find twoBitToFa, faToTwoBit, and bedSort utitities
+// available from UCSC
 ucscToolsDir="/usr/local/ucscTools"
-repeatMaskerDir="/usr/local/RepeatMasker-4.1.2-p1"
-//ucscToolsDir="/lustre/work/daray/software/ucscTools"
-//repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
-//repeatMaskerDir="/home/rhubley/RepeatMasker-4.1.2p1-df36"
-//repeatMaskerDir="/home/rhubley/RepeatMasker-412p1-newthresh-human"
+// Directory to find the current version of RepeatMasker
+repeatMaskerDir="/usr/local/RepeatMasker-4.1.5"
 
 // process params
 batchSize = params.batchSize
@@ -143,10 +146,11 @@ if ( params.xsmall != "undefined" ) {
 // Proc to allocate
 proc = pa_param * cpus_per_pa
 
-//
-// Setup executor for different environments, particularly 
-// well-known-environments.
-//
+///////
+/////// CUSTOMIZE CLUSTER ENVIRONMENT HERE BY ADDING YOUR OWN
+/////// CLUSTER NAMES OR USE 'local' TO RUN ON THE CURRENT 
+/////// MACHINE.
+///////
 // No cluster...just local execution
 if ( params.cluster == "local" ) {
   thisExecutor = "local"
@@ -173,7 +177,6 @@ if ( params.cluster == "local" ) {
   repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
   thisScratch = "/state/partition1"
 }
-
 
 
 log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version

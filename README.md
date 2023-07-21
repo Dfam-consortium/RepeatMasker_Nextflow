@@ -1,4 +1,34 @@
-Nextflow script for running RepeatMasker
+Nextflow script for running RepeatMasker on large assemblies/chromosomes/contigs
+in a cluster environment.  
+
+Workflow Process:
+
+  - Breakup the input sequence into N-sized non-overlapping batches 
+  - Search each batch using RepeatMasker with the provided options  
+  - Adjust batch local output sequence names/coordinates to global sequence names/coordinates
+  - Combine files and fix linkage IDs in both out and align files (if alignments requested)
+  - Generate a summary file (similar to 'tbl' file)
+  - Compress output files
+  
+Prerequisites:
+
+  - Java JDK 11-19
+  - Nextflow 21 or 21
+  - Three UCSC Utilities:
+      o linux/windows: https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64
+      o macos: https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/
+          - twoBitToFa
+          - faToTwoBit
+          - bedSort
+  - RepeatMasker 4.x installed and configured
+
+Configuration:
+
+  - Edit the RepeatMasker_Nextflow.nf script and make the following customizations
+    for your environment:
+      o Set the dependency locations: "ucscToolsDir", and "repeatMaskerDir"
+      o Optionally setup a cluster environment for your cluster (furher down in the script)
+
 
  Parameters:
 
@@ -42,12 +72,6 @@ Nextflow script for running RepeatMasker
                     --inputLibrary /full_path_required/GCA_003113815.1-consensi.fa \
                     --cluster griz
 
-
-Installation:
-
-   - Edit genBEDBatches.pl and update ucsc tools dir
-   - Edit adjCoordinates.pl and set the lib directory for the RepeatMasker package
-   - Edit RepeatMasker_Nextflow.nf and set default and cluster parameters
 
 Robert Hubley, 3/2020
 

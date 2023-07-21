@@ -3,6 +3,7 @@ use strict;
 use Data::Dumper;
 
 # Where this script can find twoBitInfo 
+# NOTE: This is set by the Nextflow script
 my $ucscBinDir = "";
 if ( -d $ENV{'UCSCTOOLSDIR'} && -s $ENV{'UCSCTOOLSDIR'} . "/twoBitInfo" ) {
   $ucscBinDir = $ENV{'UCSCTOOLSDIR'};
