@@ -1,7 +1,7 @@
-Nextflow script for running RepeatMasker on large assemblies/chromosomes/contigs
-in a cluster environment.  
+# RepeatMasker_Nextflow.nf
+### Nextflow script for running RepeatMasker on large assemblies/chromosomes/contigs in a cluster environment.  
 
-Workflow Process:
+**Workflow Process:**
 
   - Breakup the input sequence into N-sized non-overlapping batches 
   - Search each batch using RepeatMasker with the provided options  
@@ -10,27 +10,27 @@ Workflow Process:
   - Generate a summary file (similar to 'tbl' file)
   - Compress output files
   
-Prerequisites:
+**Prerequisites:**
 
-  - Java JDK 11-19
-  - Nextflow 21 or 21
-  - Three UCSC Utilities:
-      o linux/windows: https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64
-      o macos: https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/
-          - twoBitToFa
-          - faToTwoBit
-          - bedSort
-  - RepeatMasker 4.x installed and configured
+  1. Java JDK 11-19
+  2. Nextflow 21 or 21
+  3. Three UCSC Utilities:
+     - linux/windows: https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64
+     - macos: https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64
+       - twoBitToFa
+       - faToTwoBit
+       - bedSort
+  4. RepeatMasker 4.x installed and configured
 
-Configuration:
+**Configuration:**
 
   - Edit the RepeatMasker_Nextflow.nf script and make the following customizations
     for your environment:
-      o Set the dependency locations: "ucscToolsDir", and "repeatMaskerDir"
-      o Optionally setup a cluster environment for your cluster (furher down in the script)
+    - Set the dependency locations: "ucscToolsDir", and "repeatMaskerDir"
+    - Optionally setup a cluster environment for your cluster (furher down in the script)
 
 
- Parameters:
+**Parameters:**
 
      --species         : Dfam species library ( or use inputLibrary for custom lib )
      --nolow           : Use RepeatMasker '-nolow' option.  Not recommended under normal
@@ -46,7 +46,7 @@ Configuration:
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
      --cluster         : Either "local", "quanah", "nocona" or "griz"
  
- Examples:
+ **Examples:**
 
   NOTE: On some clusters it will be necessary to use full paths to
         all files specified as parameters.
