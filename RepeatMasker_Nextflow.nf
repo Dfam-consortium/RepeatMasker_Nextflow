@@ -334,7 +334,7 @@ process combineRMAlignOutput {
   script:
   """
   for f in ${alignfiles}; do cat \$f >> combAlign; done
-  ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
+  ####${workflow.projectDir}/alignToBed.pl -fullAlign combAlign | ${ucscToolsDir}/bedSort stdin stdout | ${workflow.projectDir}/bedToAlign.pl > combAlign-sorted
   ${workflow.projectDir}/alignToBed.pl -fullAlign combAlign > tmp.bed
   # Be mindful of this buffer size...should probably make this a parameter
   sort -k1,1V -k2,2n -k3,3nr -S 3G -T ${workflow.workDir} tmp.bed > tmp.bed.sorted
