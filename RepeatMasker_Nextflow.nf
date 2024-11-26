@@ -71,7 +71,7 @@ params.inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
 params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Workflow version
-version = "1.0"
+version = "1.1"
 
 ///////
 /////// CUSTOMIZE DEPENDENCIES HERE 
