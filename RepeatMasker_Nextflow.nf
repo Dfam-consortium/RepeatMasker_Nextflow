@@ -310,7 +310,7 @@ process combineRMOUTOutput {
   grep -v -e "^\$" combOut | sort -k5,5 -k6,6n -T ${workflow.workDir} >> combOutSorted
   ${workflow.projectDir}/renumberIDs.pl combOutSorted > combOutSortedRenumbered
   mv translation-out.tsv combOutSorted-translation.tsv
-  export PATH=${ucscToolsDir}/\$PATH
+  export PATH=${ucscToolsDir}:\$PATH
   ${repeatMaskerDir}/util/buildSummary.pl -genome ${twoBitFile} -useAbsoluteGenomeSize combOutSortedRenumbered > ${twoBitFile.baseName}.summary
   gzip -c combOutSortedRenumbered > ${twoBitFile.baseName}.rmout.gz
   """
