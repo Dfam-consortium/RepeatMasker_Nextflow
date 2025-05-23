@@ -17,7 +17,7 @@ RepeatMasker_Nextflow : Run RepeatMasker on a cluster using Nextflow (DSL2)
      --engine          : Specify engine to use [ default: rmblast ]
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
      --cpus            : Number of cpus to use per batch job [ default: 12 ]
-     --cluster         : Either "local", "quanah", "nocona" or "griz"
+     --cluster         : Either "local", "quanah", "nocona" or "ua"
  
  Examples:
 
@@ -54,7 +54,7 @@ if( ! nextflow.version.matches('24.10+') ) {
 }
 
 // Defaults
-version = "2.0"
+version = "3.0"
 params.cluster = "local"
 params.outputDir = "undefined"
 params.engine = "undefined"
@@ -145,18 +145,19 @@ if ( params.cluster == "local" ) {
   repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
   thisScratch = false
 //
-// UMT Griz Cluster
+// UA Cluster
 //
-}else if ( params.cluster == "griz" ) {
+}else if ( params.cluster == "ua" ) {
   thisExecutor = "slurm"
-  thisQueue = "wheeler_lab_large_cpu"
-  thisOptions = "--tasks=1 --cpus-per-task=${proc}"
-  ucscToolsDir="/home/rh105648e/ucscTools"
-  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2"
-  repeatMaskerDir="/home/rh105648e/RepeatMasker-open-4-0-8"
-  thisScratch = "/state/partition1"
+  thisQueue = ""
+  thisOptions = "--account=twheeler --partition=standard --nodes=1 --ntasks=1 --cpus-per-task=${proc}"
+  thisAdjOptions = ""
+  ucscToolsDir="/opt/ucsc_tools"
+  repeatMaskerDir="/opt/RepeatMasker"
+  thisScratch = false
+  def user = 'whoami'.execute().text.trim()
+  xdisk_dir="/xdisk/twheeler/${user}"
 }
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // End of cluster environment customization
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,6 +175,7 @@ log.info "Queue/Partititon    : " + thisQueue
 log.info "Batch size          : " + params.batchSize
 log.info "RepeatMasker Options: " + otherOptions
 log.info "Input Sequence      : " + params.inputSequence
+log.info "Using Container     : " + process.container
 if ( libFile != "NO_FILE" ) {
   log.info "Library File        : " + libFile
 }
