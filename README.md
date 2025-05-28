@@ -14,21 +14,9 @@
 
   1. Java JDK 11-19
   2. Nextflow 24.10+
-  3. Three UCSC Utilities:
-     - linux/windows: https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64
-     - macos: https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64
-       - twoBitToFa
-       - faToTwoBit
-       - bedSort
-  4. RepeatMasker 4.x installed and configured
-
-**Configuration:**
-
-  - Edit the RepeatMasker_Nextflow.nf script and make the following customizations
-    for your environment:
-    - Set the dependency locations: "ucscToolsDir", and "repeatMaskerDir"
-    - Setup a cluster environment for your cluster
-
+  3. The latest TETools/HPC_Umbrella.sif image
+  4. A fully configured FamDB installation
+  5. Singularity/Apptainer
 
 **Parameters:**
 
@@ -51,14 +39,14 @@
 
   o Run with standard libraries and a specified species:
    
-    nextflow run /path/RepeatMasker_Nextflow.nf \
+    nextflow /path/RepeatMasker_Nextflow.nf -profile <profile> \
                     --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
                     --species "human" \
                     --cluster nocona
 
   o Run with a custom library:
 
-    nextflow run /path/RepeatMasker_Nextflow.nf \
+    nextflow /path/RepeatMasker_Nextflow.nf -profile <profile> \
                     --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
                     --inputLibrary /full_path_required/GCA_003113815.1-consensi.fa \
                     --cluster griz

@@ -47,68 +47,70 @@ Robert Hubley, 2020-2025
 /// Looking for the localization section?  Scroll down a bit...
 ///
 
+params.cpus =         null
+params.outputDir =    null
+params.species =      null
+params.inputLibrary = null
+params.engine =       null
+params.nolow =        null
+params.s =            null
+params.xsmall =       null
+params.cluster =      null
+params.batchSize =    null
+
+def thisExecutor
+def thisQueue
+def thisOptions
+def thisAdjOptions
+def thisScratch
+def batchSize
+
+def user = 'whoami'.execute().text.trim()
+
 // Check Nextflow Version
-if( ! nextflow.version.matches('24.10+') ) {
+if( ! nextflow.version.matches('>=24.10') ) {
     println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
     exit 1
 }
 
 // Defaults
 version = "3.0"
-params.cluster = "local"
-params.outputDir = "undefined"
-params.engine = "undefined"
-params.nolow = "undefined"
-params.s = "undefined"
-params.xsmall = "undefined"
-params.batchSize = 50000000
-params.species = "NO_SPECIES"
-params.cpus = 12
-params.inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
-params.inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
 
 // Setup definitions
-proc = params.cpus 
-
-if ( params.inputSequence == "${workflow.projectDir}/sample/example1-seq.fa.gz" )
-{
-    // Lower default batch size for example
-    params.batchSize = 10000
-}
+def proc = params.cpus ?: 12
 
 // process params
-outputDir = params.outputDir
-if ( params.outputDir == "undefined" ){
-  outputDir = workflow.launchDir
-}
+def outputDir = params.outputDir ?: workflow.launchDir
+def species = (params.species && !params.inputLibrary)?: null
+def inputLibrary = params.inputLibrary ?: null
+def opt_libFile = (params.inputLibrary && !params.species) ? file(inputLibrary) : 'NO_FILE'
 
-species = params.species
-libFile = params.inputLibrary
-if ( params.species != "NO_SPECIES" ) {
-  libFile = "NO_FILE"
-}
-opt_libFile = file(libFile)
+def engine = params.engine ?: null
 
-otherOptions = ""
-cpus_per_pa = 1
-if ( params.engine != "undefined" ) {
-  if ( params.engine == "hmmer" ) {
+def otherOptions = ""
+def cpus_per_pa = 1
+if ( engine != null ) {
+  if ( engine == "hmmer" ) {
     // Number of cpus needed per -pa increment with nhmmer
     cpus_per_pa = 2
   }
-  otherOptions += " -engine " + params.engine + " -pa " + params.cpus.intdiv(cpus_per_pa)
+  otherOptions += " -engine " + engine + " -pa " + proc.intdiv(cpus_per_pa)
 }else {
   // Number of cpus needed per -pa increment with rmblast
   cpus_per_pa = 4
-  otherOptions += " -engine rmblast" + " -pa " + params.cpus.intdiv(cpus_per_pa)
+  otherOptions += " -engine rmblast" + " -pa " + proc.intdiv(cpus_per_pa)
 }
-if ( params.nolow != "undefined" ) {
+
+def nolow = params.nolow ?: null
+def s = params.s ?: null
+def xsmall = params.xsmall ?: null
+if ( nolow != null ) {
   otherOptions += " -nolow"
 }
-if ( params.s != "undefined" ) {
+if ( s != null ) {
   otherOptions += " -s"
 }
-if ( params.xsmall != "undefined" ) {
+if ( xsmall != null ) {
   otherOptions += " -xsmall"
 }
 
@@ -119,44 +121,53 @@ if ( params.xsmall != "undefined" ) {
 /////// MACHINE.
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Default directories
-// Directory to find twoBitToFa, faToTwoBit, and bedSort utilities
-// available from UCSC: http://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads
-ucscToolsDir="/usr/local/ucscTools"
-// Directory to find the current version of RepeatMasker (https://github.com/Dfam-consortium/RepeatMasker)
-repeatMaskerDir="/usr/local/RepeatMasker"
+def cluster = params.cluster ?: "local"
 
 // No cluster...just local execution
-if ( params.cluster == "local" ) {
+if ( cluster == "local" ) {
   thisExecutor = "local"
   thisQueue = ""
   thisOptions = ""
   thisAdjOptions = ""
   thisScratch = false
+
+  // Default directories
+  // Directory to find twoBitToFa, faToTwoBit, and bedSort utilities
+  // available from UCSC: http://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads
+  // Directory to find the current version of RepeatMasker (https://github.com/Dfam-consortium/RepeatMasker)
+  ucscToolsDir="/opt/ucsc_tools"
+  repeatMaskerDir="/opt/RepeatMasker"
+
+  inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
+  inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
+  batchSize = params.batchSize ? params.batchSize : 10000
 //
 // TTU Cluster
 //
-}else if ( params.cluster == "quanah" || params.cluster == "nocona" ){
+} else if ( cluster == "quanah" || cluster == "nocona" ){
   thisExecutor = "slurm"
-  thisQueue = params.cluster
+  thisQueue = cluster
   thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc} --exclude=cpu-23-1"
   thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2 --exclude=cpu-23-1"
+  thisScratch = false
+  batchSize = params.batchSize ? params.batchSize :  50000000
+
   ucscToolsDir="/lustre/work/daray/software/ucscTools"
   repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
-  thisScratch = false
+
 //
 // UA Cluster
 //
-}else if ( params.cluster == "ua" ) {
+} else if ( cluster == "ua" ) {
   thisExecutor = "slurm"
   thisQueue = ""
   thisOptions = "--account=twheeler --partition=standard --nodes=1 --ntasks=1 --cpus-per-task=${proc}"
   thisAdjOptions = ""
+  thisScratch = false
+  batchSize = params.batchSize ? param.batchSize :  50000000
+
   ucscToolsDir="/opt/ucsc_tools"
   repeatMaskerDir="/opt/RepeatMasker"
-  thisScratch = false
-  def user = 'whoami'.execute().text.trim()
-  xdisk_dir="/xdisk/twheeler/${user}"
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // End of cluster environment customization
@@ -170,21 +181,19 @@ log.info "working directory   : " + workflow.workDir
 log.info "RepeatMaskerDir     : " + repeatMaskerDir
 log.info "UCSCToolsDir        : " + ucscToolsDir
 log.info "Output Directory    : " + outputDir
-log.info "Cluster             : " + params.cluster
+log.info "Cluster             : " + cluster
 log.info "Queue/Partititon    : " + thisQueue
-log.info "Batch size          : " + params.batchSize
+log.info "Batch size          : " + batchSize
 log.info "RepeatMasker Options: " + otherOptions
-log.info "Input Sequence      : " + params.inputSequence
-log.info "Using Container     : " + process.container
-if ( libFile != "NO_FILE" ) {
-  log.info "Library File        : " + libFile
+log.info "Input Sequence      : " + inputSequence
+if ( inputLibrary != null ) {
+  log.info "Library File        : " + inputLibrary
 }
-if ( params.species != "NO_SPECIES" ) {
-  log.info "Species             : " + params.species
+if ( params.species != null ) {
+  log.info "Species             : " + species
 }
-log.info "CPUs Per Task       : " + params.cpus
+log.info "CPUs Per Task       : " + proc
 log.info "\n"
-
 
 
 process warmupRepeatMasker {
@@ -342,45 +351,57 @@ process combineRMAlignOutput {
   """
 }
 
+process my_process {
+    // container '/home/agray/projects/Dfam-umbrella/HPC/HPC_Umbrella.sif'
+
+    script:
+    """
+    /opt/RepeatMasker/RepeatMasker -v
+    """
+}
+
 workflow {
-   warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa")
-
-   twoBitFile = genTwoBitFile(params.inputSequence)
-
-   batchChan = genBatches(twoBitFile, params.batchSize) | flatten
-
-   rmskResults = RepeatMasker(warmupComplete, batchChan, opt_libFile, twoBitFile) | flatten
-
-   rmskResults
-         .branch {
-             rmskAlignChan: it.name.contains(".align")
-             rmskOutChan: it.name.contains(".out")
-            }
-         .set{ rmskBranchedResults }
-
-   translationFile = rmskBranchedResults.rmskOutChan \
-        | collectFile(name: "combOut") \
-        | combine(twoBitFile) \
-        | combineRMOUTOutput \
-        | first \
-        | map { v -> v[2] } 
-
-
-   combAlignFile = rmskBranchedResults.rmskAlignChan \
-        | collectFile(name: "combAlign") 
-
-   combineRMAlignOutput(translationFile, combAlignFile, twoBitFile)
+  my_process()
 }
+// workflow {
+//    warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa")
 
-workflow.onComplete {
-            log.info """
-        Pipeline execution summary
-        ---------------------------
-        Completed at: ${workflow.complete}
-        Duration    : ${workflow.duration}
-        Success     : ${workflow.success}
-        workDir     : ${workflow.workDir}
-        exit status : ${workflow.exitStatus}
-        Error report: ${workflow.errorReport ?: '-'}
-        """
-}
+//    twoBitFile = genTwoBitFile(inputSequence)
+
+//    batchChan = genBatches(twoBitFile, batchSize) | flatten
+
+//    rmskResults = RepeatMasker(warmupComplete, batchChan, opt_libFile, twoBitFile) | flatten
+
+//    rmskResults
+//          .branch {
+//              rmskAlignChan: it.name.contains(".align")
+//              rmskOutChan: it.name.contains(".out")
+//             }
+//          .set{ rmskBranchedResults }
+
+//    translationFile = rmskBranchedResults.rmskOutChan \
+//         | collectFile(name: "combOut") \
+//         | combine(twoBitFile) \
+//         | combineRMOUTOutput \
+//         | first \
+//         | map { v -> v[2] } 
+
+
+//    combAlignFile = rmskBranchedResults.rmskAlignChan \
+//         | collectFile(name: "combAlign") 
+
+//    combineRMAlignOutput(translationFile, combAlignFile, twoBitFile)
+// }
+
+// workflow.onComplete {
+//             log.info """
+//         Pipeline execution summary
+//         ---------------------------
+//         Completed at: ${workflow.complete}
+//         Duration    : ${workflow.duration}
+//         Success     : ${workflow.success}
+//         workDir     : ${workflow.workDir}
+//         exit status : ${workflow.exitStatus}
+//         Error report: ${workflow.errorReport ?: '-'}
+//         """
+// }
