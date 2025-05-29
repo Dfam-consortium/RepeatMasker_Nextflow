@@ -57,6 +57,8 @@ version = "3.0"
 
 //  HPC Parameters
 def proc = params.cpus ?: 12
+def inputSequence = params.inputSequence ?: null
+def outputDir = params.outputDir ?: workflow.launchDir
 
 def thisExecutor =    params.thisExecutor
 def thisQueue =       params.thisQueue 
@@ -74,6 +76,7 @@ def opt_libFile = (params.inputLibrary && !params.species) ? file(inputLibrary) 
 
 def otherOptions = ""
 def cpus_per_pa = 1
+def engine = params.engine ?: null
 if ( engine != null ) {
   if ( engine == "hmmer" ) {
     // Number of cpus needed per -pa increment with nhmmer
@@ -98,10 +101,6 @@ def xsmall = params.xsmall ?: null
 if ( xsmall != null ) {
   otherOptions += " -xsmall"
 }
-
-def engine = params.engine ?: null
-def inputSequence = params.inputSequence ?: null
-def outputDir = params.outputDir ?: workflow.launchDir
 
 // Print out the configuration
 log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
@@ -279,57 +278,55 @@ process combineRMAlignOutput {
   """
 }
 
-process my_process {
-    // container '/home/agray/projects/Dfam-umbrella/HPC/HPC_Umbrella.sif'
-   
-    script:
-    """
-    /opt/RepeatMasker/RepeatMasker -v
-    """
-}
+// process my_process {
+//     script:
+//     """
+//     /opt/RepeatMasker/RepeatMasker -v
+//     """
+// }
+// workflow {
+//   my_process()
+// }
 
 workflow {
-  my_process()
+   warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa")
+
+   twoBitFile = genTwoBitFile(inputSequence)
+
+   batchChan = genBatches(twoBitFile, batchSize) | flatten
+
+   rmskResults = RepeatMasker(warmupComplete, batchChan, opt_libFile, twoBitFile) | flatten
+
+   rmskResults
+         .branch {
+             rmskAlignChan: it.name.contains(".align")
+             rmskOutChan: it.name.contains(".out")
+            }
+         .set{ rmskBranchedResults }
+
+   translationFile = rmskBranchedResults.rmskOutChan \
+        | collectFile(name: "combOut") \
+        | combine(twoBitFile) \
+        | combineRMOUTOutput \
+        | first \
+        | map { v -> v[2] } 
+
+
+   combAlignFile = rmskBranchedResults.rmskAlignChan \
+        | collectFile(name: "combAlign") 
+
+   combineRMAlignOutput(translationFile, combAlignFile, twoBitFile)
 }
-// workflow {
-//    warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa")
 
-//    twoBitFile = genTwoBitFile(inputSequence)
-
-//    batchChan = genBatches(twoBitFile, batchSize) | flatten
-
-//    rmskResults = RepeatMasker(warmupComplete, batchChan, opt_libFile, twoBitFile) | flatten
-
-//    rmskResults
-//          .branch {
-//              rmskAlignChan: it.name.contains(".align")
-//              rmskOutChan: it.name.contains(".out")
-//             }
-//          .set{ rmskBranchedResults }
-
-//    translationFile = rmskBranchedResults.rmskOutChan \
-//         | collectFile(name: "combOut") \
-//         | combine(twoBitFile) \
-//         | combineRMOUTOutput \
-//         | first \
-//         | map { v -> v[2] } 
-
-
-//    combAlignFile = rmskBranchedResults.rmskAlignChan \
-//         | collectFile(name: "combAlign") 
-
-//    combineRMAlignOutput(translationFile, combAlignFile, twoBitFile)
-// }
-
-// workflow.onComplete {
-//             log.info """
-//         Pipeline execution summary
-//         ---------------------------
-//         Completed at: ${workflow.complete}
-//         Duration    : ${workflow.duration}
-//         Success     : ${workflow.success}
-//         workDir     : ${workflow.workDir}
-//         exit status : ${workflow.exitStatus}
-//         Error report: ${workflow.errorReport ?: '-'}
-//         """
-// }
+workflow.onComplete {
+            log.info """
+        Pipeline execution summary
+        ---------------------------
+        Completed at: ${workflow.complete}
+        Duration    : ${workflow.duration}
+        Success     : ${workflow.success}
+        workDir     : ${workflow.workDir}
+        exit status : ${workflow.exitStatus}
+        Error report: ${workflow.errorReport ?: '-'}
+        """
+}
