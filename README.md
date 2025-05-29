@@ -15,7 +15,7 @@
   1. Java JDK 11-19
   2. Nextflow 24.10+
   3. The latest TETools/HPC_Umbrella.sif image
-  4. A fully configured FamDB installation
+  4. An appropriately configured FamDB installation
   5. Singularity/Apptainer
 
 **Parameters:**

@@ -43,49 +43,34 @@ RepeatMasker_Nextflow : Run RepeatMasker on a cluster using Nextflow (DSL2)
 Robert Hubley, 2020-2025
 */
 
-/// 
-/// Looking for the localization section?  Scroll down a bit...
-///
-
-params.cpus =         null
-params.outputDir =    null
-params.species =      null
-params.inputLibrary = null
-params.engine =       null
-params.nolow =        null
-params.s =            null
-params.xsmall =       null
-params.cluster =      null
-params.batchSize =    null
-
-def thisExecutor
-def thisQueue
-def thisOptions
-def thisAdjOptions
-def thisScratch
-def batchSize
-
-def user = 'whoami'.execute().text.trim()
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+/////// CUSTOMIZE CLUSTER ENVIRONMENT HERE BY ADDING YOUR OWN PROFILE TO nextflow.config
+/////// USE '-profile local' TO RUN ON THE CURRENT MACHINE
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Check Nextflow Version
 if( ! nextflow.version.matches('>=24.10') ) {
     println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
     exit 1
 }
-
-// Defaults
 version = "3.0"
 
-// Setup definitions
+//  HPC Parameters
 def proc = params.cpus ?: 12
 
+def thisExecutor =    params.thisExecutor
+def thisQueue =       params.thisQueue 
+def thisOptions =     (params.cluster == 'local') ? params.thisOptions : params.thisOptions + "--cpus-per-task=${proc}"
+def thisAdjOptions =  params.thisAdjOptions
+def thisScratch =     params.thisScratch
+def ucscToolsDir =    params.ucscToolsDir
+def repeatMaskerDir = params.repeatMaskerDir
+def batchSize =       params.batchSize ?: 50000000
+
 // process params
-def outputDir = params.outputDir ?: workflow.launchDir
-def species = (params.species && !params.inputLibrary)?: null
+def species = (params.species && !params.inputLibrary) ? params.species: null
 def inputLibrary = params.inputLibrary ?: null
 def opt_libFile = (params.inputLibrary && !params.species) ? file(inputLibrary) : 'NO_FILE'
-
-def engine = params.engine ?: null
 
 def otherOptions = ""
 def cpus_per_pa = 1
@@ -102,77 +87,21 @@ if ( engine != null ) {
 }
 
 def nolow = params.nolow ?: null
-def s = params.s ?: null
-def xsmall = params.xsmall ?: null
 if ( nolow != null ) {
   otherOptions += " -nolow"
 }
+def s = params.s ?: null
 if ( s != null ) {
   otherOptions += " -s"
 }
+def xsmall = params.xsmall ?: null
 if ( xsmall != null ) {
   otherOptions += " -xsmall"
 }
 
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-/////// CUSTOMIZE CLUSTER ENVIRONMENT HERE BY ADDING YOUR OWN
-/////// CLUSTER NAMES OR USE 'local' TO RUN ON THE CURRENT 
-/////// MACHINE.
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-
-def cluster = params.cluster ?: "local"
-
-// No cluster...just local execution
-if ( cluster == "local" ) {
-  thisExecutor = "local"
-  thisQueue = ""
-  thisOptions = ""
-  thisAdjOptions = ""
-  thisScratch = false
-
-  // Default directories
-  // Directory to find twoBitToFa, faToTwoBit, and bedSort utilities
-  // available from UCSC: http://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads
-  // Directory to find the current version of RepeatMasker (https://github.com/Dfam-consortium/RepeatMasker)
-  ucscToolsDir="/opt/ucsc_tools"
-  repeatMaskerDir="/opt/RepeatMasker"
-
-  inputSequence = "${workflow.projectDir}/sample/example1-seq.fa.gz"
-  inputLibrary = "${workflow.projectDir}/sample/example1-lib.fa"
-  batchSize = params.batchSize ? params.batchSize : 10000
-//
-// TTU Cluster
-//
-} else if ( cluster == "quanah" || cluster == "nocona" ){
-  thisExecutor = "slurm"
-  thisQueue = cluster
-  thisOptions = "--tasks=1 -N 1 --cpus-per-task=${proc} --exclude=cpu-23-1"
-  thisAdjOptions = "--tasks=1 -N 1 --cpus-per-task=2 --exclude=cpu-23-1"
-  thisScratch = false
-  batchSize = params.batchSize ? params.batchSize :  50000000
-
-  ucscToolsDir="/lustre/work/daray/software/ucscTools"
-  repeatMaskerDir="/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
-
-//
-// UA Cluster
-//
-} else if ( cluster == "ua" ) {
-  thisExecutor = "slurm"
-  thisQueue = ""
-  thisOptions = "--account=twheeler --partition=standard --nodes=1 --ntasks=1 --cpus-per-task=${proc}"
-  thisAdjOptions = ""
-  thisScratch = false
-  batchSize = params.batchSize ? param.batchSize :  50000000
-
-  ucscToolsDir="/opt/ucsc_tools"
-  repeatMaskerDir="/opt/RepeatMasker"
-}
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-// End of cluster environment customization
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-
+def engine = params.engine ?: null
+def inputSequence = params.inputSequence ?: null
+def outputDir = params.outputDir ?: workflow.launchDir
 
 // Print out the configuration
 log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
@@ -181,7 +110,7 @@ log.info "working directory   : " + workflow.workDir
 log.info "RepeatMaskerDir     : " + repeatMaskerDir
 log.info "UCSCToolsDir        : " + ucscToolsDir
 log.info "Output Directory    : " + outputDir
-log.info "Cluster             : " + cluster
+log.info "Cluster             : " + params.cluster
 log.info "Queue/Partititon    : " + thisQueue
 log.info "Batch size          : " + batchSize
 log.info "RepeatMasker Options: " + otherOptions
@@ -194,7 +123,6 @@ if ( params.species != null ) {
 }
 log.info "CPUs Per Task       : " + proc
 log.info "\n"
-
 
 process warmupRepeatMasker {
 
@@ -353,7 +281,7 @@ process combineRMAlignOutput {
 
 process my_process {
     // container '/home/agray/projects/Dfam-umbrella/HPC/HPC_Umbrella.sif'
-
+   
     script:
     """
     /opt/RepeatMasker/RepeatMasker -v
