@@ -72,7 +72,7 @@ def batchSize =       params.batchSize ?: 50000000
 // process params
 def species = (params.species && !params.inputLibrary) ? params.species: null
 def inputLibrary = params.inputLibrary ?: null
-def opt_libFile = (params.inputLibrary && !params.species) ? file(inputLibrary) : 'NO_FILE'
+def opt_libFile = (params.inputLibrary && !params.species) ? file(inputLibrary) : null
 
 def otherOptions = ""
 def cpus_per_pa = 1
@@ -207,7 +207,7 @@ process RepeatMasker {
   tuple path("${batch_file.baseName}.fa.out"), path("${batch_file.baseName}.fa.align")
 
   script:
-  def libOpt = inLibFile.name != 'NO_FILE' ? "-lib $inLibFile" : "-species '" + species + "'"
+  def libOpt = inLibFile ? "-lib $inLibFile" : "-species '" + species + "'"
   """
   #
   # Run RepeatMasker and readjust coordinates
