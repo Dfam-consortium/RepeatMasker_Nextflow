@@ -138,7 +138,7 @@ process warmupRepeatMasker {
   # force it to initialize the cached libraries.  Do not want to do this on the
   # cluster ( in parallel ) as it may cause each job to attempt the build at once.
   #
-  hostname > node
+  # hostname > node
   ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${small_seq.baseName}.fa >& ${small_seq.baseName}.rmlog
   """
 }
