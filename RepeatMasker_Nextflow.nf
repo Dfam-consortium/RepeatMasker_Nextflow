@@ -69,10 +69,21 @@ def ucscToolsDir =    params.ucscToolsDir
 def repeatMaskerDir = params.repeatMaskerDir
 def batchSize =       params.batchSize ?: 50000000
 
-// process params
-def species = (params.species && !params.inputLibrary) ? params.species: ''
+// process params TODO resolve this
+def libOpt = ''
+def species = params.species ?: null
 def inputLibrary = params.inputLibrary ?: null
-def opt_libFile = (params.inputLibrary && !params.species) ? file(inputLibrary) : file('NO_FILE')
+
+if (params.species && !params.inputLibrary) {
+  libOpt +=  "-species '" + species + "'"
+}
+else if (params.inputLibrary && !params.species) {
+  libOpt +=  "-lib " + file(inputLibrary)
+}
+else if (params.inputLibrary && params.species){
+  error("The --species and --inputLibrary parameters are mutually exclusive")
+}
+
 
 def otherOptions = ""
 def cpus_per_pa = 1
@@ -200,14 +211,13 @@ process RepeatMasker {
   input:
   val warmupComplete
   path batch_file
-  path inLibFile
+  path libOpt
   path inSeqTwoBitFile
 
   output:
   tuple path("${batch_file.baseName}.fa.out"), path("${batch_file.baseName}.fa.align")
 
   script:
-  def libOpt = (inLibFile.name != 'NO_FILE') ? "-lib $inLibFile" : "-species '" + species + "'"
   """
   #
   # Run RepeatMasker and readjust coordinates
@@ -295,7 +305,7 @@ workflow {
 
    batchChan = genBatches(twoBitFile, batchSize) | flatten
 
-   rmskResults = RepeatMasker(warmupComplete, batchChan, opt_libFile, twoBitFile) | flatten
+   rmskResults = RepeatMasker(warmupComplete, batchChan, libOpt, twoBitFile) | flatten
 
    rmskResults
          .branch {
