@@ -48,97 +48,13 @@ Robert Hubley, 2020-2025
 /////// USE '-profile local' TO RUN ON THE CURRENT MACHINE
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Check Nextflow Version
-if( ! nextflow.version.matches('>=24.10') ) {
-    println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
-    exit 1
-}
-version = "3.0"
-
-//  HPC Parameters
-def proc = params.cpus ?: 12
-def inputSequence = params.inputSequence ?: null
-def outputDir = params.outputDir ?: workflow.launchDir
-
-def thisExecutor =    params.thisExecutor
-def thisQueue =       params.thisQueue 
-def thisOptions =     (params.cluster == 'local') ? params.thisOptions : params.thisOptions + "--cpus-per-task=${proc}"
-def thisAdjOptions =  params.thisAdjOptions
-def thisScratch =     params.thisScratch
-def ucscToolsDir =    params.ucscToolsDir
-def repeatMaskerDir = params.repeatMaskerDir
-def batchSize =       params.batchSize ?: 50000000
-
-// process params TODO resolve this
-def libOpt = ''
-def species = params.species ?: null
-def inputLibrary = params.inputLibrary ?: null
-
-if (params.species && !params.inputLibrary) {
-  libOpt +=  "-species '" + species + "'"
-}
-else if (params.inputLibrary && !params.species) {
-  libOpt +=  "-lib " + file(inputLibrary)
-}
-else if (params.inputLibrary && params.species){
-  error "The --species and --inputLibrary parameters are mutually exclusive"
-  exit 1
-}
-
-
-def otherOptions = ""
-def cpus_per_pa = 1
-def engine = params.engine ?: null
-if ( engine != null ) {
-  if ( engine == "hmmer" ) {
-    // Number of cpus needed per -pa increment with nhmmer
-    cpus_per_pa = 2
-  }
-  otherOptions += " -engine " + engine + " -pa " + proc.intdiv(cpus_per_pa)
-}else {
-  // Number of cpus needed per -pa increment with rmblast
-  cpus_per_pa = 4
-  otherOptions += " -engine rmblast" + " -pa " + proc.intdiv(cpus_per_pa)
-}
-
-def nolow = params.nolow ?: null
-if ( nolow != null ) {
-  otherOptions += " -nolow"
-}
-def s = params.s ?: null
-if ( s != null ) {
-  otherOptions += " -s"
-}
-def xsmall = params.xsmall ?: null
-if ( xsmall != null ) {
-  otherOptions += " -xsmall"
-}
-
-// Print out the configuration
-log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
-log.info "===================================================================="
-log.info "working directory   : " + workflow.workDir
-log.info "RepeatMaskerDir     : " + repeatMaskerDir
-log.info "UCSCToolsDir        : " + ucscToolsDir
-log.info "Output Directory    : " + outputDir
-log.info "Cluster             : " + params.cluster
-log.info "Queue/Partititon    : " + thisQueue
-log.info "Batch size          : " + batchSize
-log.info "RepeatMasker Options: " + otherOptions
-log.info "Input Sequence      : " + inputSequence
-if ( inputLibrary != null ) {
-  log.info "Library File        : " + inputLibrary
-}
-if ( params.species != null ) {
-  log.info "Species             : " + species
-}
-log.info "CPUs Per Task       : " + proc
-log.info "\n"
 
 process warmupRepeatMasker {
 
   input:
   path small_seq
+  val repeatMaskerDir
+  val otherOptions
 
   output:
   val true
@@ -156,13 +72,14 @@ process warmupRepeatMasker {
 }
 
 process genTwoBitFile {
-  executor = thisExecutor
-  queue = thisQueue
-  clusterOptions = thisOptions
-  scratch = thisScratch
+  // executor = thisExecutor
+  // queue = thisQueue
+  // clusterOptions = thisOptions
+  // scratch = thisScratch
 
   input:
   path inSeqFile
+  val ucscToolsDir
 
   output:
   path '*.2bit'
@@ -183,14 +100,15 @@ process genTwoBitFile {
 
 
 process genBatches {
-  executor = thisExecutor
-  queue = thisQueue
-  clusterOptions = thisOptions
-  scratch = thisScratch
+  // executor = thisExecutor
+  // queue = thisQueue
+  // clusterOptions = thisOptions
+  // scratch = thisScratch
 
   input:
   path twoBitFile
   val batchSize
+  val ucscToolsDir
 
   output:
   path 'batch*.bed'
@@ -204,16 +122,19 @@ process genBatches {
 }
 
 process RepeatMasker {
-  executor = thisExecutor
-  queue = thisQueue
-  clusterOptions = thisOptions
-  scratch = thisScratch
+  // executor = thisExecutor
+  // queue = thisQueue
+  // clusterOptions = thisOptions
+  // scratch = thisScratch
 
   input:
   val warmupComplete
   path batch_file
   path libOpt
   path inSeqTwoBitFile
+  path ucscToolsDir
+  path repeatMaskerDir
+  val otherOptions
 
   output:
   tuple path("${batch_file.baseName}.fa.out"), path("${batch_file.baseName}.fa.align")
@@ -235,15 +156,15 @@ process RepeatMasker {
 }
 
 process combineRMOUTOutput {
-  executor = thisExecutor
-  queue = thisQueue
-  clusterOptions = thisAdjOptions
-  scratch = thisScratch
+  // executor = thisExecutor
+  // queue = thisQueue
+  // clusterOptions = thisAdjOptions
+  // scratch = thisScratch
 
-  publishDir "${outputDir}", mode: 'copy'
+  publishDir("${outputDir}", mode: 'copy')
 
   input:
-  tuple path(combinedFile), path(twoBitFile)
+  tuple path(combinedFile), path(twoBitFile), path(outputDir), path(ucscToolsDir), path(repeatMaskerDir)
 
   output:
   tuple path('*.rmout.gz'), path('*.summary'), path('combOutSorted-translation.tsv')
@@ -262,10 +183,10 @@ process combineRMOUTOutput {
 }
 
 process combineRMAlignOutput {
-  executor = thisExecutor
-  queue = thisQueue
-  clusterOptions = thisAdjOptions
-  scratch = thisScratch
+  // executor = thisExecutor
+  // queue = thisQueue
+  // clusterOptions = thisAdjOptions
+  // scratch = thisScratch
 
   publishDir "${outputDir}", mode: 'copy'
 
@@ -273,6 +194,9 @@ process combineRMAlignOutput {
   path translationFile
   path combinedFile
   path twoBitFile
+  path outputDir
+  path ucscToolsDir
+  path repeatMaskerDir
 
   output:
   path '*.rmalign.gz'
@@ -289,47 +213,130 @@ process combineRMAlignOutput {
   """
 }
 
-// process my_process {
-//     script:
-//     """
-//     /opt/RepeatMasker/RepeatMasker -v
-//     """
-// }
-// workflow {
-//   my_process()
-// }
-
 workflow {
-   warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa")
 
-   twoBitFile = genTwoBitFile(inputSequence)
+  // Check Nextflow Version
+  if( ! nextflow.version.matches('>=24.10') ) {
+      println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
+      exit 1
+  }
+  version = "3.0"
 
-   batchChan = genBatches(twoBitFile, batchSize) | flatten
+  //  HPC Parameters
+  def proc = params.cpus ?: 12
+  def inputSequence = params.inputSequence ?: null
+  def outputDir = params.outputDir ?: workflow.launchDir
 
-   rmskResults = RepeatMasker(warmupComplete, batchChan, libOpt, twoBitFile) | flatten
+  // def thisExecutor =    params.thisExecutor
+  def thisQueue =       params.thisQueue 
+  // def thisOptions =     (params.cluster == 'local') ? params.thisOptions : params.thisOptions + "--cpus-per-task=${proc}"
+  // def thisAdjOptions =  params.thisAdjOptions
+  // def thisScratch =     params.thisScratch
+  def ucscToolsDir =    params.ucscToolsDir
+  def repeatMaskerDir = params.repeatMaskerDir
+  def batchSize =       params.batchSize ?: 50000000
 
-   rmskResults
-         .branch {
-             rmskAlignChan: it.name.contains(".align")
-             rmskOutChan: it.name.contains(".out")
-            }
-         .set{ rmskBranchedResults }
+  // process params TODO resolve this
+  def libOpt = ''
+  def species = params.species ?: null
+  def inputLibrary = params.inputLibrary ?: null
 
-   translationFile = rmskBranchedResults.rmskOutChan \
-        | collectFile(name: "combOut") \
-        | combine(twoBitFile) \
-        | combineRMOUTOutput \
-        | first \
-        | map { v -> v[2] } 
+  if (species && !inputLibrary) {
+    libOpt +=  "-species '" + species + "'"
+  }
+  else if (inputLibrary && !species) {
+    libOpt +=  "-lib " + file(inputLibrary)
+  }
+  else if (inputLibrary && species){
+    error "The --species and --inputLibrary parameters are mutually exclusive"
+  }
 
 
-   combAlignFile = rmskBranchedResults.rmskAlignChan \
-        | collectFile(name: "combAlign") 
+  def otherOptions = ""
+  def cpus_per_pa = 1
+  def engine = params.engine ?: null
+  if ( engine != null ) {
+    if ( engine == "hmmer" ) {
+      // Number of cpus needed per -pa increment with nhmmer
+      cpus_per_pa = 2
+    }
+    otherOptions += " -engine " + engine + " -pa " + proc.intdiv(cpus_per_pa)
+  } else {
+    // Number of cpus needed per -pa increment with rmblast
+    cpus_per_pa = 4
+    otherOptions += " -engine rmblast" + " -pa " + proc.intdiv(cpus_per_pa)
+  }
 
-   combineRMAlignOutput(translationFile, combAlignFile, twoBitFile)
-}
+  def nolow = params.nolow ?: null
+  if ( nolow != null ) {
+    otherOptions += " -nolow"
+  }
+  def s = params.s ?: null
+  if ( s != null ) {
+    otherOptions += " -s"
+  }
+  def xsmall = params.xsmall ?: null
+  if ( xsmall != null ) {
+    otherOptions += " -xsmall"
+  }
 
-workflow.onComplete {
+  // Print out the configuration
+  log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
+  log.info "===================================================================="
+  log.info "working directory   : " + workflow.workDir
+  log.info "RepeatMaskerDir     : " + repeatMaskerDir
+  log.info "UCSCToolsDir        : " + ucscToolsDir
+  log.info "Output Directory    : " + outputDir
+  log.info "Cluster             : " + params.cluster
+  log.info "Queue/Partititon    : " + thisQueue
+  log.info "Batch size          : " + batchSize
+  log.info "RepeatMasker Options: " + otherOptions
+  log.info "Input Sequence      : " + inputSequence
+  if ( inputLibrary != null ) {
+    log.info "Library File        : " + inputLibrary
+  }
+  if ( params.species != null ) {
+    log.info "Species             : " + species
+  }
+  log.info "CPUs Per Task       : " + proc
+  log.info "\n"
+
+  warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa", repeatMaskerDir, otherOptions)
+
+  twoBitFile = genTwoBitFile(inputSequence, ucscToolsDir)
+
+  batchChan = genBatches(twoBitFile, batchSize, ucscToolsDir) | flatten
+
+  rmskResults = RepeatMasker(warmupComplete, batchChan, libOpt, twoBitFile, ucscToolsDir, repeatMaskerDir, otherOptions) | flatten
+
+  rmskResults
+        .branch {
+            rmskAlignChan: it.name.contains(".align")
+            rmskOutChan: it.name.contains(".out")
+          }
+        .set{ rmskBranchedResults }
+
+  def outputDirCh        = Channel.value(outputDir)
+  def ucscToolsDirCh     = Channel.value(ucscToolsDir)
+  def repeatMaskerDirCh  = Channel.value(repeatMaskerDir)
+
+  translationFile = rmskBranchedResults.rmskOutChan \
+      | collectFile(name: "combOut") \
+      | combine(twoBitFile) \
+      | combine(outputDirCh) \
+      | combine(ucscToolsDirCh) \
+      | combine(repeatMaskerDirCh) \
+      | combineRMOUTOutput \
+      | first \
+      | map { v -> v[2] } 
+
+
+  combAlignFile = rmskBranchedResults.rmskAlignChan \
+      | collectFile(name: "combAlign") 
+
+  combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
+
+  workflow.onComplete {
             log.info """
         Pipeline execution summary
         ---------------------------
@@ -340,4 +347,5 @@ workflow.onComplete {
         exit status : ${workflow.exitStatus}
         Error report: ${workflow.errorReport ?: '-'}
         """
+  }
 }
