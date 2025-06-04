@@ -81,7 +81,8 @@ else if (params.inputLibrary && !params.species) {
   libOpt +=  "-lib " + file(inputLibrary)
 }
 else if (params.inputLibrary && params.species){
-  error("The --species and --inputLibrary parameters are mutually exclusive")
+  error "The --species and --inputLibrary parameters are mutually exclusive"
+  exit 1
 }
 
 
