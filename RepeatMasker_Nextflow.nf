@@ -109,6 +109,7 @@ process genBatches {
   path twoBitFile
   val batchSize
   val ucscToolsDir
+  path genBEDBatches
 
   output:
   path 'batch*.bed'
@@ -117,7 +118,8 @@ process genBatches {
   """
   # This can magically accept FASTA, Gzip'd FASTA, or 2BIT...but 2Bit is prob. fastest
   export UCSCTOOLSDIR=${ucscToolsDir}
-  ${workflow.projectDir}/genBEDBatches.pl ${twoBitFile} ${batchSize}
+  perl ${genBEDBatches} ${twoBitFile} ${batchSize}
+
   """
 }
 
@@ -301,11 +303,13 @@ workflow {
   log.info "CPUs Per Task       : " + proc
   log.info "\n"
 
-  warmupComplete = warmupRepeatMasker("${workflow.projectDir}/sample/small-seq.fa", repeatMaskerDir, otherOptions)
+  def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
+  warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions)
 
   twoBitFile = genTwoBitFile(inputSequence, ucscToolsDir)
 
-  batchChan = genBatches(twoBitFile, batchSize, ucscToolsDir) | flatten
+  def genBEDBatches = file("${workflow.projectDir}/genBEDBatches.pl")
+  batchChan = genBatches(twoBitFile, batchSize, ucscToolsDir, genBEDBatches) | flatten
 
   rmskResults = RepeatMasker(warmupComplete, batchChan, libOpt, twoBitFile, ucscToolsDir, repeatMaskerDir, otherOptions) | flatten
 
