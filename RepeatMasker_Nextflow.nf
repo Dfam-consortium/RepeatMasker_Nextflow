@@ -132,10 +132,13 @@ process RepeatMasker {
   input:
   val warmupComplete
   path batch_file
+  val lib
+  val species
   path libOpt
   path inSeqTwoBitFile
-  path ucscToolsDir
-  path repeatMaskerDir
+  val ucscToolsDir
+  val repeatMaskerDir
+  path adjCoordinates
   val otherOptions
 
   output:
@@ -147,10 +150,10 @@ process RepeatMasker {
   # Run RepeatMasker and readjust coordinates
   #
   ${ucscToolsDir}/twoBitToFa -bed=${batch_file} ${inSeqTwoBitFile} ${batch_file.baseName}.fa
-  ${repeatMaskerDir}/RepeatMasker -a ${otherOptions} ${libOpt} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
+  ${repeatMaskerDir}/RepeatMasker -a ${otherOptions} ${lib} ${species} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
   export REPEATMASKER_DIR=${repeatMaskerDir}
-  ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.out 
-  ${workflow.projectDir}/adjCoordinates.pl ${batch_file} ${batch_file.baseName}.fa.align
+  perl ${adjCoordinates} ${batch_file} ${batch_file.baseName}.fa.out 
+  perl ${adjCoordinates} ${batch_file} ${batch_file.baseName}.fa.align
   cp ${batch_file.baseName}.fa.out ${batch_file.baseName}.fa.out.unadjusted
   mv ${batch_file.baseName}.fa.out.adjusted ${batch_file.baseName}.fa.out
   mv ${batch_file.baseName}.fa.align.adjusted ${batch_file.baseName}.fa.align
@@ -197,8 +200,8 @@ process combineRMAlignOutput {
   path combinedFile
   path twoBitFile
   path outputDir
-  path ucscToolsDir
-  path repeatMaskerDir
+  val ucscToolsDir
+  val repeatMaskerDir
 
   output:
   path '*.rmalign.gz'
@@ -215,6 +218,15 @@ process combineRMAlignOutput {
   """
 }
 
+process makeDummyFile {
+    output:
+    path 'empty.txt'
+
+    script:
+    """
+    touch empty.txt
+    """
+}
 workflow {
 
   // Check Nextflow Version
@@ -239,20 +251,25 @@ workflow {
   def batchSize =       params.batchSize ?: 50000000
 
   // process params TODO resolve this
-  def libOpt = ''
-  def species = params.species ?: null
+  def libOpt = null
+  def species = params.species ?: ''
   def inputLibrary = params.inputLibrary ?: null
 
   if (species && !inputLibrary) {
-    libOpt +=  "-species '" + species + "'"
+    species = "-species '" + species + "'"
   }
   else if (inputLibrary && !species) {
-    libOpt +=  "-lib " + file(inputLibrary)
+    libOpt = file(inputLibrary)
   }
   else if (inputLibrary && species){
     error "The --species and --inputLibrary parameters are mutually exclusive"
   }
-
+  def lib = ''
+  if (libOpt) {
+    lib = '-lib ' + libOpt.name 
+  } else {
+    libOpt = makeDummyFile()
+  }
 
   def otherOptions = ""
   def cpus_per_pa = 1
@@ -311,7 +328,9 @@ workflow {
   def genBEDBatches = file("${workflow.projectDir}/genBEDBatches.pl")
   batchChan = genBatches(twoBitFile, batchSize, ucscToolsDir, genBEDBatches) | flatten
 
-  rmskResults = RepeatMasker(warmupComplete, batchChan, libOpt, twoBitFile, ucscToolsDir, repeatMaskerDir, otherOptions) | flatten
+  
+  def adjCoordinates = file("${workflow.projectDir}/adjCoordinates.pl")
+  rmskResults = RepeatMasker(warmupComplete, batchChan, lib, species, libOpt, twoBitFile, ucscToolsDir, repeatMaskerDir, adjCoordinates, otherOptions) | flatten
 
   rmskResults
         .branch {
@@ -335,21 +354,21 @@ workflow {
       | map { v -> v[2] } 
 
 
-  combAlignFile = rmskBranchedResults.rmskAlignChan \
-      | collectFile(name: "combAlign") 
+  // combAlignFile = rmskBranchedResults.rmskAlignChan \
+  //     | collectFile(name: "combAlign") 
 
-  combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
+  // combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
 
-  workflow.onComplete {
-            log.info """
-        Pipeline execution summary
-        ---------------------------
-        Completed at: ${workflow.complete}
-        Duration    : ${workflow.duration}
-        Success     : ${workflow.success}
-        workDir     : ${workflow.workDir}
-        exit status : ${workflow.exitStatus}
-        Error report: ${workflow.errorReport ?: '-'}
-        """
-  }
+  // workflow.onComplete {
+  //           log.info """
+  //       Pipeline execution summary
+  //       ---------------------------
+  //       Completed at: ${workflow.complete}
+  //       Duration    : ${workflow.duration}
+  //       Success     : ${workflow.success}
+  //       workDir     : ${workflow.workDir}
+  //       exit status : ${workflow.exitStatus}
+  //       Error report: ${workflow.errorReport ?: '-'}
+  //       """
+  // }
 }
