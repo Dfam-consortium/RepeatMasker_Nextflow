@@ -169,7 +169,7 @@ process combineRMOUTOutput {
   publishDir("${outputDir}", mode: 'copy')
 
   input:
-  tuple path(combinedFile), path(twoBitFile), path(outputDir), path(ucscToolsDir), path(repeatMaskerDir)
+  tuple path(combinedFile), path(twoBitFile), path(outputDir), val(ucscToolsDir), val(repeatMaskerDir)
 
   output:
   tuple path('*.rmout.gz'), path('*.summary'), path('combOutSorted-translation.tsv')
@@ -354,21 +354,19 @@ workflow {
       | map { v -> v[2] } 
 
 
-  // combAlignFile = rmskBranchedResults.rmskAlignChan \
-  //     | collectFile(name: "combAlign") 
+  combAlignFile = rmskBranchedResults.rmskAlignChan \
+      | collectFile(name: "combAlign") 
 
-  // combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
+  combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
 
-  // workflow.onComplete {
-  //           log.info """
-  //       Pipeline execution summary
-  //       ---------------------------
-  //       Completed at: ${workflow.complete}
-  //       Duration    : ${workflow.duration}
-  //       Success     : ${workflow.success}
-  //       workDir     : ${workflow.workDir}
-  //       exit status : ${workflow.exitStatus}
-  //       Error report: ${workflow.errorReport ?: '-'}
-  //       """
-  // }
+  workflow.onComplete {
+    log.info "Pipeline execution summary"
+    log.info "---------------------------"
+    log.info "Completed at: ${workflow.complete}"
+    log.info "Duration    : ${workflow.duration}"
+    log.info "Success     : ${workflow.success}"
+    log.info "workDir     : ${workflow.workDir}"
+    log.info "exit status : ${workflow.exitStatus}"
+    log.info "Error report: ${workflow.errorReport ?: '-'}"
+  }
 }
