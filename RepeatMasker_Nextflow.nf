@@ -219,20 +219,20 @@ process combineRMAlignOutput {
 }
 
 process makeDummyFile {
-    output:
-    path 'empty.txt'
+  output:
+  path 'empty.txt'
 
-    script:
-    """
-    touch empty.txt
-    """
+  script:
+  """
+  touch empty.txt
+  """
 }
 workflow {
 
   // Check Nextflow Version
   if( ! nextflow.version.matches('>=24.10') ) {
-      println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
-      exit 1
+    println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
+    exit 1
   }
   version = "3.0"
 
@@ -333,40 +333,40 @@ workflow {
   rmskResults = RepeatMasker(warmupComplete, batchChan, lib, species, libOpt, twoBitFile, ucscToolsDir, repeatMaskerDir, adjCoordinates, otherOptions) | flatten
 
   rmskResults
-        .branch {
-            rmskAlignChan: it.name.contains(".align")
-            rmskOutChan: it.name.contains(".out")
-          }
-        .set{ rmskBranchedResults }
+    .branch {
+      rmskAlignChan: it.name.contains(".align")
+      rmskOutChan: it.name.contains(".out")
+    }
+    .set{ rmskBranchedResults }
 
   def outputDirCh        = Channel.value(outputDir)
   def ucscToolsDirCh     = Channel.value(ucscToolsDir)
   def repeatMaskerDirCh  = Channel.value(repeatMaskerDir)
 
   translationFile = rmskBranchedResults.rmskOutChan \
-      | collectFile(name: "combOut") \
-      | combine(twoBitFile) \
-      | combine(outputDirCh) \
-      | combine(ucscToolsDirCh) \
-      | combine(repeatMaskerDirCh) \
-      | combineRMOUTOutput \
-      | first \
-      | map { v -> v[2] } 
+    | collectFile(name: "combOut") \
+    | combine(twoBitFile) \
+    | combine(outputDirCh) \
+    | combine(ucscToolsDirCh) \
+    | combine(repeatMaskerDirCh) \
+    | combineRMOUTOutput \
+    | first \
+    | map { v -> v[2] } 
 
 
   combAlignFile = rmskBranchedResults.rmskAlignChan \
-      | collectFile(name: "combAlign") 
+    | collectFile(name: "combAlign") 
 
   combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
 
-  workflow.onComplete {
+  workflow.onComplete = {
     log.info "Pipeline execution summary"
     log.info "---------------------------"
-    log.info "Completed at: ${workflow.complete}"
-    log.info "Duration    : ${workflow.duration}"
-    log.info "Success     : ${workflow.success}"
-    log.info "workDir     : ${workflow.workDir}"
-    log.info "exit status : ${workflow.exitStatus}"
-    log.info "Error report: ${workflow.errorReport ?: '-'}"
+    log.info "Completed at : ${workflow.complete}"
+    log.info "Duration     : ${workflow.duration}"
+    log.info "Success      : ${workflow.success}"
+    log.info "workDir      : ${workflow.workDir}"
+    log.info "exit status  : ${workflow.exitStatus}"
+    log.info "Error report : ${workflow.errorReport ?: '-'}"
   }
 }
