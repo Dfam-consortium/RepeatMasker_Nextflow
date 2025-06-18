@@ -72,10 +72,6 @@ process warmupRepeatMasker {
 }
 
 process genTwoBitFile {
-  // executor = thisExecutor
-  // queue = thisQueue
-  // clusterOptions = thisOptions
-  // scratch = thisScratch
 
   input:
   path inSeqFile
@@ -90,8 +86,7 @@ process genTwoBitFile {
   if [ ${inSeqFile.extension} == "gz" ]; then
     gunzip -c ${inSeqFile} | ${ucscToolsDir}/faToTwoBit -long stdin ${inSeqFile.baseName}.2bit
   elif [ ${inSeqFile.extension} == "2bit" ]; then
-    # Ah....the luxury of 2bit
-    sleep 0
+    mv ${inSeqFile} processed.${inSeqFile}
   else
     ${ucscToolsDir}/faToTwoBit -long ${inSeqFile} ${inSeqFile.baseName}.2bit
   fi  
@@ -100,10 +95,6 @@ process genTwoBitFile {
 
 
 process genBatches {
-  // executor = thisExecutor
-  // queue = thisQueue
-  // clusterOptions = thisOptions
-  // scratch = thisScratch
 
   input:
   path twoBitFile
@@ -124,10 +115,6 @@ process genBatches {
 }
 
 process RepeatMasker {
-  // executor = thisExecutor
-  // queue = thisQueue
-  // clusterOptions = thisOptions
-  // scratch = thisScratch
 
   input:
   val warmupComplete
@@ -161,10 +148,6 @@ process RepeatMasker {
 }
 
 process combineRMOUTOutput {
-  // executor = thisExecutor
-  // queue = thisQueue
-  // clusterOptions = thisAdjOptions
-  // scratch = thisScratch
 
   publishDir("${outputDir}", mode: 'copy')
 
@@ -188,10 +171,6 @@ process combineRMOUTOutput {
 }
 
 process combineRMAlignOutput {
-  // executor = thisExecutor
-  // queue = thisQueue
-  // clusterOptions = thisAdjOptions
-  // scratch = thisScratch
 
   publishDir "${outputDir}", mode: 'copy'
 
@@ -227,6 +206,7 @@ process makeDummyFile {
   touch empty.txt
   """
 }
+
 workflow {
 
   // Check Nextflow Version
@@ -243,9 +223,6 @@ workflow {
 
   // def thisExecutor =    params.thisExecutor
   def thisQueue =       params.thisQueue 
-  // def thisOptions =     (params.cluster == 'local') ? params.thisOptions : params.thisOptions + "--cpus-per-task=${proc}"
-  // def thisAdjOptions =  params.thisAdjOptions
-  // def thisScratch =     params.thisScratch
   def ucscToolsDir =    params.ucscToolsDir
   def repeatMaskerDir = params.repeatMaskerDir
   def batchSize =       params.batchSize ?: 50000000
