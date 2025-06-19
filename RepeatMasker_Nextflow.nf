@@ -88,7 +88,7 @@ process genTwoBitFile {
   elif [ ${inSeqFile.extension} == "2bit" ]; then
     mv ${inSeqFile} processed.${inSeqFile}
   else
-    ${ucscToolsDir}/faToTwoBit -long ${inSeqFile} ${inSeqFile.baseName}.2bit
+    ${ucscToolsDir}/faToTwoBit -long ${inSeqFile} processed.${inSeqFile.baseName}.2bit
   fi  
   """
 }
@@ -139,8 +139,8 @@ process RepeatMasker {
   ${ucscToolsDir}/twoBitToFa -bed=${batch_file} ${inSeqTwoBitFile} ${batch_file.baseName}.fa
   ${repeatMaskerDir}/RepeatMasker -a ${otherOptions} ${lib} ${species} ${batch_file.baseName}.fa >& ${batch_file.baseName}.rmlog
   export REPEATMASKER_DIR=${repeatMaskerDir}
-  perl ${adjCoordinates} ${batch_file} ${batch_file.baseName}.fa.out 
-  perl ${adjCoordinates} ${batch_file} ${batch_file.baseName}.fa.align
+  perl ${adjCoordinates} ${batch_file} ${batch_file.baseName}.fa.out || touch ${batch_file.baseName}.fa.out
+  perl ${adjCoordinates} ${batch_file} ${batch_file.baseName}.fa.align || touch ${batch_file.baseName}.fa.align
   cp ${batch_file.baseName}.fa.out ${batch_file.baseName}.fa.out.unadjusted
   mv ${batch_file.baseName}.fa.out.adjusted ${batch_file.baseName}.fa.out
   mv ${batch_file.baseName}.fa.align.adjusted ${batch_file.baseName}.fa.align
