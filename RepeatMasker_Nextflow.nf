@@ -86,6 +86,7 @@ process genTwoBitFile {
   if [ ${inSeqFile.extension} == "gz" ]; then
     gunzip -c ${inSeqFile} | ${ucscToolsDir}/faToTwoBit -long stdin ${inSeqFile.baseName}.2bit
   elif [ ${inSeqFile.extension} == "2bit" ]; then
+    # renaming the link includes it in the output. Nextflow seems to exclude inputs from the blobbed output
     mv ${inSeqFile} processed.${inSeqFile}
   else
     ${ucscToolsDir}/faToTwoBit -long ${inSeqFile} processed.${inSeqFile.baseName}.2bit
