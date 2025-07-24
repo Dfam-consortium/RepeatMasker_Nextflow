@@ -1,0 +1,4 @@
+.nextflow/
+work/
+.nextflow.log*
+HPC_testing/

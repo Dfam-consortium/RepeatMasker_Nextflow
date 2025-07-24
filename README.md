@@ -14,21 +14,9 @@
 
   1. Java JDK 11-19
   2. Nextflow 24.10+
-  3. Three UCSC Utilities:
-     - linux/windows: https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64
-     - macos: https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64
-       - twoBitToFa
-       - faToTwoBit
-       - bedSort
-  4. RepeatMasker 4.x installed and configured
-
-**Configuration:**
-
-  - Edit the RepeatMasker_Nextflow.nf script and make the following customizations
-    for your environment:
-    - Set the dependency locations: "ucscToolsDir", and "repeatMaskerDir"
-    - Setup a cluster environment for your cluster
-
+  3. The latest TETools/HPC_Umbrella.sif image
+  4. An appropriately configured FamDB installation
+  5. Singularity/Apptainer
 
 **Parameters:**
 
@@ -43,22 +31,53 @@
      --engine          : Specify engine to use [ default: rmblast ]
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
      --cluster         : Either "local", "quanah", "nocona" or "griz"
- 
- **Examples:**
+
+**Configuration**
+
+  The specific settings for a cluster can be added to the `nextflow.config`.
+  An Example:
+  ```
+  profiles{
+      your_profile {
+  
+          // boilerplate
+          params.cluster = your_profile // should be the same as the profile name
+          params.thisExecutor = "slurm"
+          params.thisQueue = 
+          params.thisOptions = // PI account details
+          params.thisAdjOptions = 
+          params.thisScratch = 
+
+          // Directory to find twoBitToFa, faToTwoBit, and bedSort utilities
+          // available from UCSC: http://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads
+          params.ucscToolsDir= "/opt/ucsc_tools" // if using TETools
+          
+          // Directory to find the current version of RepeatMasker (https://github.com/Dfam-consortium/RepeatMasker)
+          params.repeatMaskerDir= "/opt/RepeatMasker" // if using TETools
+          
+          // other options here
+          apptainer.enabled = true
+          apptainer.autoMounts = true
+          apptainer.runOptions = " -B .../Libraries:/opt/RepeatMasker/Libraries "
+      }
+  }
+  ```
+
+**Examples:**
 
   NOTE: On some clusters it will be necessary to use full paths to
         all files specified as parameters.
 
   o Run with standard libraries and a specified species:
    
-    nextflow run /path/RepeatMasker_Nextflow.nf \
+    nextflow /path/RepeatMasker_Nextflow.nf -profile <profile> \
                     --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
                     --species "human" \
                     --cluster nocona
 
   o Run with a custom library:
 
-    nextflow run /path/RepeatMasker_Nextflow.nf \
+    nextflow /path/RepeatMasker_Nextflow.nf -profile <profile> \
                     --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
                     --inputLibrary /full_path_required/GCA_003113815.1-consensi.fa \
                     --cluster griz
