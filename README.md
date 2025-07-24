@@ -31,8 +31,39 @@
      --engine          : Specify engine to use [ default: rmblast ]
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
      --cluster         : Either "local", "quanah", "nocona" or "griz"
- 
- **Examples:**
+
+**Configuration**
+
+  The specific settings for a cluster can be added to the `nextflow.config`.
+  An Example:
+  ```
+  profiles{
+      your_profile {
+  
+          // boilerplate
+          params.cluster = your_profile // should be the same as the profile name
+          params.thisExecutor = "slurm"
+          params.thisQueue = 
+          params.thisOptions = // PI account details
+          params.thisAdjOptions = 
+          params.thisScratch = 
+
+          // Directory to find twoBitToFa, faToTwoBit, and bedSort utilities
+          // available from UCSC: http://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads
+          params.ucscToolsDir= "/opt/ucsc_tools" // if using TETools
+          
+          // Directory to find the current version of RepeatMasker (https://github.com/Dfam-consortium/RepeatMasker)
+          params.repeatMaskerDir= "/opt/RepeatMasker" // if using TETools
+          
+          // other options here
+          apptainer.enabled = true
+          apptainer.autoMounts = true
+          apptainer.runOptions = " -B .../Libraries:/opt/RepeatMasker/Libraries "
+      }
+  }
+  ```
+
+**Examples:**
 
   NOTE: On some clusters it will be necessary to use full paths to
         all files specified as parameters.
