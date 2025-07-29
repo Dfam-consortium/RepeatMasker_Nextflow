@@ -55,6 +55,7 @@ process warmupRepeatMasker {
   path small_seq
   val repeatMaskerDir
   val otherOptions
+  val species
 
   output:
   val true
@@ -67,7 +68,7 @@ process warmupRepeatMasker {
   # cluster ( in parallel ) as it may cause each job to attempt the build at once.
   #
   # hostname > node
-  ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${small_seq.baseName}.fa >& ${small_seq.baseName}.rmlog
+  ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${species} ${small_seq.baseName}.fa >& ${small_seq.baseName}.rmlog
   """
 }
 
@@ -300,7 +301,7 @@ workflow {
   log.info "\n"
 
   def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
-  warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions)
+  warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions, species)
 
   twoBitFile = genTwoBitFile(inputSequence, ucscToolsDir)
 
