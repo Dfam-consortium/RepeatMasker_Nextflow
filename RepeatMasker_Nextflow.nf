@@ -210,6 +210,47 @@ process makeDummyFile {
   """
 }
 
+process generate_metadata {
+  publishDir "${outputDir}", mode: 'copy'
+
+  input:
+  path outputDir
+  path outputfile
+  val assembly
+  val rmsk_ver
+  val dfam_ver
+  val repbase_ver
+  val algorithm
+  val famdb_ver
+  val run_date
+  val otherOptions
+  val species
+  val lib
+  val tax_id
+
+  output:
+  path outputfile
+
+  script:
+  """
+  cat <<EOF > ${outputfile}
+  {
+    "assembly": "${assembly}",
+    "rmsk_ver": "${rmsk_ver}",
+    "dfam_ver": "${dfam_ver}",
+    "repbase_ver": "${repbase_ver}",
+    "algorithm": "${algorithm}",
+    "path": null,
+    "famdb_ver": "${famdb_ver}",
+    "run_date": "${run_date}",
+    "rmsk_commands": "${otherOptions} ${lib} ${species}",
+    "public": true,
+    "tax_id": "${tax_id}",
+    "species": "${species}"
+  }
+  EOF
+  """
+}
 workflow {
 
   // Check Nextflow Version
@@ -218,6 +259,19 @@ workflow {
     exit 1
   }
   version = "3.0"
+
+  // meta params
+  def assembly = params.assembly ?: null
+  def dfam_ver = params.dfam_ver ?: null
+  def rmsk_ver = params.rmsk_ver ?: null
+  def famdb_ver = params.famdb_ver ?: null
+  def repbase_ver = params.repbase_ver ?: null
+  def tax_id = params.tax_id ?: null
+
+  if (!assembly || !dfam_ver || !rmsk_ver || !famdb_ver || !repbase_ver || !tax_id){
+    println "Please provide --assembly --dfam_ver --rmsk_ver --famdb_ver --repbase_ver --tax_id metadata for this run. Use 'null' when one is not present"
+    exit 1
+  }
 
   //  HPC Parameters
   def proc = params.cpus ?: 12
@@ -299,6 +353,11 @@ workflow {
   }
   log.info "CPUs Per Task       : " + proc
   log.info "\n"
+
+  def algorithm = params.engine ?: "rmblast"
+  def run_date = new Date().format("yyy-MM-dd")
+  def metafile = file("${outputDir}/${assembly}-run_data.json")
+  generate_metadata(outputDir, metafile, assembly, rmsk_ver, dfam_ver, repbase_ver, algorithm, famdb_ver, run_date, otherOptions, species, lib, tax_id)
 
   def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
   warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions, species)
