@@ -18,6 +18,8 @@ RepeatMasker_Nextflow : Run RepeatMasker on a cluster using Nextflow (DSL2)
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
      --cpus            : Number of cpus to use per batch job [ default: 12 ]
      --cluster         : Either "local", "quanah", "nocona" or "ua"
+     --assembly        : Metadata value
+     --repbase_ver     : Metadata value
  
  Examples:
 
@@ -214,41 +216,21 @@ process generate_metadata {
   publishDir "${outputDir}", mode: 'copy'
 
   input:
+  path metadataScript
   path outputDir
-  path outputfile
   val assembly
-  val rmsk_ver
-  val dfam_ver
   val repbase_ver
   val algorithm
-  val famdb_ver
-  val run_date
   val otherOptions
   val species
   val lib
-  val tax_id
 
   output:
-  path outputfile
+  path "${assembly}_${algorithm}-run_data.json"
 
   script:
   """
-  cat <<EOF > ${outputfile}
-  {
-    "assembly": "${assembly}",
-    "rmsk_ver": "${rmsk_ver}",
-    "dfam_ver": "${dfam_ver}",
-    "repbase_ver": "${repbase_ver}",
-    "algorithm": "${algorithm}",
-    "path": null,
-    "famdb_ver": "${famdb_ver}",
-    "run_date": "${run_date}",
-    "rmsk_commands": "${otherOptions} ${lib} ${species}",
-    "public": true,
-    "tax_id": "${tax_id}",
-    "species": "${species}"
-  }
-  EOF
+  python3 ${metadataScript} -a ${assembly} -${species} -r ${repbase_ver} -g ${algorithm} -c "${otherOptions} ${lib}"
   """
 }
 workflow {
@@ -262,14 +244,10 @@ workflow {
 
   // meta params
   def assembly = params.assembly ?: null
-  def dfam_ver = params.dfam_ver ?: null
-  def rmsk_ver = params.rmsk_ver ?: null
-  def famdb_ver = params.famdb_ver ?: null
   def repbase_ver = params.repbase_ver ?: null
-  def tax_id = params.tax_id ?: null
 
-  if (!assembly || !dfam_ver || !rmsk_ver || !famdb_ver || !repbase_ver || !tax_id){
-    println "Please provide --assembly --dfam_ver --rmsk_ver --famdb_ver --repbase_ver --tax_id metadata for this run. Use 'null' when one is not present"
+  if (!assembly){
+    println "Please provide an assembly accession with --assembly for this run."
     exit 1
   }
 
@@ -355,9 +333,8 @@ workflow {
   log.info "\n"
 
   def algorithm = params.engine ?: "rmblast"
-  def run_date = new Date().format("yyy-MM-dd")
-  def metafile = file("${outputDir}/${assembly}-run_data.json")
-  generate_metadata(outputDir, metafile, assembly, rmsk_ver, dfam_ver, repbase_ver, algorithm, famdb_ver, run_date, otherOptions, species, lib, tax_id)
+  def metadataFile = file("${workflow.projectDir}/gen_run_metadata.py")
+  generate_metadata(metadataFile, outputDir, assembly, repbase_ver, algorithm, otherOptions, species, lib)
 
   def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
   warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions, species)
