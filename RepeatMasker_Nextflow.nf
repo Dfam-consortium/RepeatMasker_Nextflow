@@ -51,6 +51,38 @@ Robert Hubley, 2020-2025
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+process generate_metadata {
+  publishDir(
+    path: "${outputDir}/${assembly}",
+    mode: 'copy',
+    saveAs: { f ->
+      def fname = f.toString().split('/').last()
+      if (fname.endsWith("run_data.json"))
+          return "run_data.json"
+      return fname
+    }
+  )
+
+  input:
+  path metadataScript
+  path outputDir
+  val assembly
+  val repbase_ver
+  val algorithm
+  val otherOptions
+  val key
+  val lib
+
+  output:
+  path "${assembly}_${algorithm}-run_data.json"
+
+  script:
+  """
+  python3 ${metadataScript} -a ${assembly} -${key} -r ${repbase_ver} -g ${algorithm} -c "${otherOptions} ${lib}"
+  """
+}
+
+
 process warmupRepeatMasker {
 
   input:
@@ -73,6 +105,7 @@ process warmupRepeatMasker {
   ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${species} ${small_seq.baseName}.fa >& ${small_seq.baseName}.rmlog
   """
 }
+
 
 process genTwoBitFile {
 
@@ -118,14 +151,15 @@ process genBatches {
   """
 }
 
+
 process RepeatMasker {
 
   input:
   val warmupComplete
   path batch_file
   val lib
+  path libOpt // this needs to be here to ensure that the library file is accessible in the work dir
   val species
-  path libOpt
   path inSeqTwoBitFile
   val ucscToolsDir
   val repeatMaskerDir
@@ -151,6 +185,7 @@ process RepeatMasker {
   mv ${batch_file.baseName}.fa.align.adjusted ${batch_file.baseName}.fa.align
   """
 }
+
 
 process combineRMOUTOutput {
 
@@ -187,6 +222,7 @@ process combineRMOUTOutput {
   gzip -c combOutSortedRenumbered > ${twoBitFile.baseName}.rmout.gz
   """
 }
+
 
 process combineRMAlignOutput {
 
@@ -225,46 +261,7 @@ process combineRMAlignOutput {
   """
 }
 
-process makeDummyFile {
-  output:
-  path 'empty.txt'
 
-  script:
-  """
-  touch empty.txt
-  """
-}
-
-process generate_metadata {
-  publishDir(
-    path: "${outputDir}/${assembly}",
-    mode: 'copy',
-    saveAs: { f ->
-      def fname = f.toString().split('/').last()
-      if (fname.endsWith("run_data.json"))
-          return "run_data.json"
-      return fname
-    }
-  )
-
-  input:
-  path metadataScript
-  path outputDir
-  val assembly
-  val repbase_ver
-  val algorithm
-  val otherOptions
-  val species
-  val lib
-
-  output:
-  path "${assembly}_${algorithm}-run_data.json"
-
-  script:
-  """
-  python3 ${metadataScript} -a ${assembly} -${species} -r ${repbase_ver} -g ${algorithm} -c "${otherOptions} ${lib}"
-  """
-}
 workflow {
 
   // Check Nextflow Version
@@ -314,8 +311,9 @@ workflow {
   def lib = ''
   if (libOpt) {
     lib = '-lib ' + libOpt.name 
+    libOpt = Channel.value(libOpt)
   } else {
-    libOpt = makeDummyFile()
+    libOpt = Channel.empty()
   }
 
   def otherOptions = ""
@@ -369,7 +367,8 @@ workflow {
 
   def algorithm = params.engine ?: "rmblast"
   def metadataFile = file("${workflow.projectDir}/gen_run_metadata.py")
-  generate_metadata(metadataFile, outputDir, assembly, repbase_ver, algorithm, otherOptions, species, lib)
+  def key = species ?: lib
+  generate_metadata(metadataFile, outputDir, assembly, repbase_ver, algorithm, otherOptions, key, lib)
 
   def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
   warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions, species)
@@ -381,7 +380,7 @@ workflow {
 
   
   def adjCoordinates = file("${workflow.projectDir}/adjCoordinates.pl")
-  rmskResults = RepeatMasker(warmupComplete, batchChan, lib, species, libOpt, twoBitFile, ucscToolsDir, repeatMaskerDir, adjCoordinates, otherOptions) | flatten
+  rmskResults = RepeatMasker(warmupComplete, batchChan, lib, libOpt, species, twoBitFile, ucscToolsDir, repeatMaskerDir, adjCoordinates, otherOptions) | flatten
 
   rmskResults
     .branch {

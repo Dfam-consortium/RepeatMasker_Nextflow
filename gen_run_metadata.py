@@ -9,10 +9,13 @@ import os
 def main(*args):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-a", "--assembly_accession", required=True)
-    parser.add_argument("-s", "--species", required=True)
     parser.add_argument("-r", "--rep_base", required=True)
     parser.add_argument("-g", "--algorithm", required=True)
     parser.add_argument("-c", "--rmsk_commands", required=True)
+    
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-s", "--species")
+    group.add_argument("-l", "--lib")
 
     args = parser.parse_args()
 
@@ -29,73 +32,83 @@ def main(*args):
         "rmsk_commands": args.rmsk_commands,
     }
 
-    # FamDB Names Command
-    names_result = subprocess.run(
-        [
-            famdb_py,
-            "-i",
-            famdb_lib,
-            "names",
-            args.species,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.decode("utf-8")
-    lines = names_result.split("\n")
-    if "Exact Matches" not in lines:
-        print("Error: Exact name match not found")
-        exit(1)
-    for line in lines:
-        if line.startswith("Taxon: "):
-            names = line.split(",")
-            for name in names:
-                if name.startswith("Taxon:"):
-                    metadata["tax_id"] = name.split(" ")[-1]
-                if "(sanitized scientific name)" in name:
-                    metadata["species"] = name.strip().split(" ")[0]
-            break
+    if args.species:
+        # FamDB Names Command
+        names_result = subprocess.run(
+            [
+                famdb_py,
+                "-i",
+                famdb_lib,
+                "names",
+                args.species,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout.decode("utf-8")
+        lines = names_result.split("\n")
+        if "Exact Matches" not in lines:
+            print("Error: Exact name match not found")
+            exit(1)
+        for line in lines:
+            if line.startswith("Taxon: "):
+                names = line.split(",")
+                for name in names:
+                    if name.startswith("Taxon:"):
+                        metadata["tax_id"] = name.split(" ")[-1]
+                    if "(sanitized scientific name)" in name:
+                        metadata["species"] = name.strip().split(" ")[0]
+                break
 
-    # FamDB Info Command
-    info_result = subprocess.run(
-        [
-            famdb_py,
-            "-i",
-            famdb_lib,
-            "info",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.decode("utf-8")
-    lines = info_result.split("\n")
-    for line in lines:
-        if line.startswith("FamDB Creation Format Version : ") or line.startswith(
-            "FamDB Format Version:"
-        ):
-            metadata["famdb_ver"] = line.strip().split(" ")[-1]
-        if line.startswith("Version : "):
-            metadata["dfam_ver"] = line.strip().split(" ")[-1]
+        # FamDB Lineage Command
+        lineage_result = subprocess.run(
+            [
+                famdb_py,
+                "-i",
+                famdb_lib,
+                "lineage",
+                "-a",
+                "--format",
+                "totals",
+                metadata["species"],
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout.decode("utf-8")
+        lines = lineage_result.split(";")
+        for line in lines:
+            if "entries in ancestors" in line:
+                metadata["ancestral_fams"] = int(line.strip().split(" ")[0])
+            if "lineage-specific entries" in line:
+                metadata["specific_fams"] = int(line.strip().split(" ")[0])
 
-    # FamDB Lineage Command
-    lineage_result = subprocess.run(
-        [
-            famdb_py,
-            "-i",
-            famdb_lib,
-            "lineage",
-            "-a",
-            "--format",
-            "totals",
-            metadata["species"],
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.decode("utf-8")
-    lines = lineage_result.split(";")
-    for line in lines:
-        if "entries in ancestors" in line:
-            metadata["ancestral_fams"] = int(line.strip().split(" ")[0])
-        if "lineage-specific entries" in line:
-            metadata["specific_fams"] = int(line.strip().split(" ")[0])
+        # FamDB Info Command
+        info_result = subprocess.run(
+            [
+                famdb_py,
+                "-i",
+                famdb_lib,
+                "info",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout.decode("utf-8")
+        lines = info_result.split("\n")
+        for line in lines:
+            if line.startswith("FamDB Creation Format Version : ") or line.startswith(
+                "FamDB Format Version:"
+            ):
+                metadata["famdb_ver"] = line.strip().split(" ")[-1]
+            if line.startswith("Version : "):
+                metadata["dfam_ver"] = line.strip().split(" ")[-1]
+
+    elif args.lib:
+        metadata["tax_id"] = 'placeholder'
+        metadata["species"] = 'placeholder'
+        metadata["ancestral_fams"] = 'placeholder'
+        metadata["specific_fams"] = 'placeholder'
+        metadata["famdb_ver"] = 'placeholder'
+        metadata["dfam_ver"] = 'placeholder'
+
 
     # RepeatMasker Version Command
     rm_result = subprocess.run(
