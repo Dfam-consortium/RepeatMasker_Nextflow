@@ -154,7 +154,20 @@ process RepeatMasker {
 
 process combineRMOUTOutput {
 
-  publishDir("${outputDir}", mode: 'copy')
+  publishDir(
+    path: "${outputDir}/${params.assembly}",
+    mode: 'copy',
+    saveAs: { f ->
+      def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
+      def base = file(twoBitFile).baseName
+      if (fname.endsWith(".rmout.gz"))
+        return "${base}.out.gz"
+      if (fname == "combOutSorted-translation.tsv") {
+        return null
+      }
+      return fname
+    }
+  )
 
   input:
   tuple path(combinedFile), path(twoBitFile), path(outputDir), val(ucscToolsDir), val(repeatMaskerDir)
@@ -177,7 +190,17 @@ process combineRMOUTOutput {
 
 process combineRMAlignOutput {
 
-  publishDir "${outputDir}", mode: 'copy'
+  publishDir(
+    path: "${outputDir}/${params.assembly}",
+    mode: 'copy',
+    saveAs: { f ->
+      def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
+      def base = file(twoBitFile).baseName
+      if (fname.endsWith('.rmalign.gz'))
+          return "${base}.align.gz"
+      return fname
+    }
+  )
 
   input:
   path translationFile
@@ -213,7 +236,16 @@ process makeDummyFile {
 }
 
 process generate_metadata {
-  publishDir "${outputDir}", mode: 'copy'
+  publishDir(
+    path: "${outputDir}/${assembly}",
+    mode: 'copy',
+    saveAs: { f ->
+      def fname = f.toString().split('/').last()
+      if (fname.endsWith("run_data.json"))
+          return "run_data.json"
+      return fname
+    }
+  )
 
   input:
   path metadataScript
@@ -244,11 +276,10 @@ workflow {
 
   // meta params
   def assembly = params.assembly ?: null
-  def repbase_ver = params.repbase_ver ?: null
+  def repbase_ver = params.repbase_ver ?: 'null'
 
   if (!assembly){
-    println "Please provide an assembly accession with --assembly for this run."
-    exit 1
+    error "Please provide an assembly accession with --assembly for this run."
   }
 
   //  HPC Parameters
@@ -276,6 +307,10 @@ workflow {
   else if (inputLibrary && species){
     error "The --species and --inputLibrary parameters are mutually exclusive"
   }
+  else if (!inputLibrary && !species){
+    error "Either --species or --inputLibrary are required"
+  }
+
   def lib = ''
   if (libOpt) {
     lib = '-lib ' + libOpt.name 
