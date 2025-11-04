@@ -52,16 +52,13 @@ Robert Hubley, 2020-2025
 
 
 process generate_metadata {
-  publishDir(
-    path: "${outputDir}/${assembly}",
-    mode: 'copy',
-    saveAs: { f ->
-      def fname = f.toString().split('/').last()
-      if (fname.endsWith("run_data.json"))
-          return "run_data.json"
-      return fname
+  publishDir path: "${outputDir}/${assembly}", mode: 'copy', saveAs: { f ->
+    def fname = f.toString().split('/').last()
+    if (fname.endsWith("run_data.json")) {
+      return "run_data.json"
     }
-  )
+    return fname
+  }
 
   input:
   path metadataScript
@@ -84,7 +81,6 @@ process generate_metadata {
 
 
 process warmupRepeatMasker {
-
   input:
   path small_seq
   val repeatMaskerDir
@@ -108,7 +104,6 @@ process warmupRepeatMasker {
 
 
 process genTwoBitFile {
-
   input:
   path inSeqFile
   val ucscToolsDir
@@ -132,7 +127,6 @@ process genTwoBitFile {
 
 
 process genBatches {
-
   input:
   path twoBitFile
   val batchSize
@@ -153,12 +147,12 @@ process genBatches {
 
 
 process RepeatMasker {
-
   input:
   val warmupComplete
   path batch_file
   val lib
-  path libOpt // this needs to be here to ensure that the library file is accessible in the work dir
+  path libOpt
+  // this needs to be here to ensure that the library file is accessible in the work dir
   val species
   path inSeqTwoBitFile
   val ucscToolsDir
@@ -189,20 +183,17 @@ process RepeatMasker {
 
 process combineRMOUTOutput {
 
-  publishDir(
-    path: "${outputDir}/${params.assembly}",
-    mode: 'copy',
-    saveAs: { f ->
-      def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
-      def base = file(twoBitFile).baseName
-      if (fname.endsWith(".rmout.gz"))
-        return "${base}.out.gz"
-      if (fname == "combOutSorted-translation.tsv") {
-        return null
-      }
-      return fname
+  publishDir path: "${outputDir}/${params.assembly}", mode: 'copy', saveAs: { f ->
+    def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
+    def base = file(twoBitFile).baseName
+    if (fname.endsWith(".rmout.gz")) {
+      return "${base}.out.gz"
     }
-  )
+    if (fname == "combOutSorted-translation.tsv") {
+      return null
+    }
+    return fname
+  }
 
   input:
   tuple path(combinedFile), path(twoBitFile), path(outputDir), val(ucscToolsDir), val(repeatMaskerDir)
@@ -226,17 +217,14 @@ process combineRMOUTOutput {
 
 process combineRMAlignOutput {
 
-  publishDir(
-    path: "${outputDir}/${params.assembly}",
-    mode: 'copy',
-    saveAs: { f ->
-      def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
-      def base = file(twoBitFile).baseName
-      if (fname.endsWith('.rmalign.gz'))
-          return "${base}.align.gz"
-      return fname
+  publishDir path: "${outputDir}/${params.assembly}", mode: 'copy', saveAs: { f ->
+    def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
+    def base = file(twoBitFile).baseName
+    if (fname.endsWith('.rmalign.gz')) {
+      return "${base}.align.gz"
     }
-  )
+    return fname
+  }
 
   input:
   path translationFile
@@ -265,9 +253,9 @@ process combineRMAlignOutput {
 workflow {
 
   // Check Nextflow Version
-  if( ! nextflow.version.matches('>=24.10') ) {
-    println "This workflow requires Nextflow version 24.10 or higher -- You are running version $nextflow.version"
-    exit 1
+  if (!nextflow.version.matches('>=24.10')) {
+    println("This workflow requires Nextflow version 24.10 or higher -- You are running version ${nextflow.version}")
+    exit(1)
   }
   version = "3.0"
 
@@ -275,8 +263,8 @@ workflow {
   def assembly = params.assembly ?: null
   def repbase_ver = params.repbase_ver ?: 'null'
 
-  if (!assembly){
-    error "Please provide an assembly accession with --assembly for this run."
+  if (!assembly) {
+    error("Please provide an assembly accession with --assembly for this run.")
   }
 
   //  HPC Parameters
@@ -285,10 +273,10 @@ workflow {
   def outputDir = params.outputDir ?: workflow.launchDir
 
   // def thisExecutor =    params.thisExecutor
-  def thisQueue =       params.thisQueue 
-  def ucscToolsDir =    params.ucscToolsDir
+  def thisQueue = params.thisQueue
+  def ucscToolsDir = params.ucscToolsDir
   def repeatMaskerDir = params.repeatMaskerDir
-  def batchSize =       params.batchSize ?: 50000000
+  def batchSize = params.batchSize ?: 50000000
 
   // process params TODO resolve this
   def libOpt = null
@@ -301,69 +289,71 @@ workflow {
   else if (inputLibrary && !species) {
     libOpt = file(inputLibrary)
   }
-  else if (inputLibrary && species){
-    error "The --species and --inputLibrary parameters are mutually exclusive"
+  else if (inputLibrary && species) {
+    error("The --species and --inputLibrary parameters are mutually exclusive")
   }
-  else if (!inputLibrary && !species){
-    error "Either --species or --inputLibrary are required"
+  else if (!inputLibrary && !species) {
+    error("Either --species or --inputLibrary are required")
   }
 
   def lib = ''
   if (libOpt) {
-    lib = '-lib ' + libOpt.name 
+    lib = '-lib ' + libOpt.name
     libOpt = Channel.value(libOpt)
-  } else {
+  }
+  else {
     libOpt = Channel.empty()
   }
 
   def otherOptions = ""
   def cpus_per_pa = 1
   def engine = params.engine ?: null
-  if ( engine != null ) {
-    if ( engine == "hmmer" ) {
+  if (engine != null) {
+    if (engine == "hmmer") {
       // Number of cpus needed per -pa increment with nhmmer
       cpus_per_pa = 2
     }
     otherOptions += " -engine " + engine + " -pa " + proc.intdiv(cpus_per_pa)
-  } else {
+  }
+  else {
     // Number of cpus needed per -pa increment with rmblast
     cpus_per_pa = 4
     otherOptions += " -engine rmblast" + " -pa " + proc.intdiv(cpus_per_pa)
   }
 
   def nolow = params.nolow ?: null
-  if ( nolow != null ) {
+  if (nolow != null) {
     otherOptions += " -nolow"
   }
   def s = params.s ?: null
-  if ( s != null ) {
+  if (s != null) {
     otherOptions += " -s"
   }
   def xsmall = params.xsmall ?: null
-  if ( xsmall != null ) {
+  if (xsmall != null) {
     otherOptions += " -xsmall"
   }
 
   // Print out the configuration
-  log.info "RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version
-  log.info "===================================================================="
-  log.info "working directory   : " + workflow.workDir
-  log.info "RepeatMaskerDir     : " + repeatMaskerDir
-  log.info "UCSCToolsDir        : " + ucscToolsDir
-  log.info "Output Directory    : " + outputDir
-  log.info "Cluster             : " + params.cluster
-  log.info "Queue/Partititon    : " + thisQueue
-  log.info "Batch size          : " + batchSize
-  log.info "RepeatMasker Options: " + otherOptions
-  log.info "Input Sequence      : " + inputSequence
-  if ( inputLibrary != null ) {
-    log.info "Library File        : " + inputLibrary
+  log.info("RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version)
+  log.info("====================================================================")
+  log.info("working directory   : " + workflow.workDir)
+  log.info("RepeatMaskerDir     : " + repeatMaskerDir)
+  log.info("UCSCToolsDir        : " + ucscToolsDir)
+  log.info("Output Directory    : " + outputDir)
+  log.info("Cluster             : " + params.cluster)
+  log.info("Queue/Partititon    : " + thisQueue)
+  log.info("Batch size          : " + batchSize)
+  log.info("RepeatMasker Options: " + otherOptions)
+  log.info("Input Sequence      : " + inputSequence)
+  if (inputLibrary != null) {
+    log.info("Library File        : " + inputLibrary)
   }
-  if ( params.species != null ) {
-    log.info "Species             : " + species
+  if (params.species != null) {
+    log.info("Species             : " + species)
   }
-  log.info "CPUs Per Task       : " + proc
-  log.info "\n"
+  log.info("CPUs Per Task       : " + proc)
+  log.info("\n")
 
   def algorithm = params.engine ?: "rmblast"
   def metadataFile = file("${workflow.projectDir}/gen_run_metadata.py")
@@ -378,7 +368,7 @@ workflow {
   def genBEDBatches = file("${workflow.projectDir}/genBEDBatches.pl")
   batchChan = genBatches(twoBitFile, batchSize, ucscToolsDir, genBEDBatches) | flatten
 
-  
+
   def adjCoordinates = file("${workflow.projectDir}/adjCoordinates.pl")
   rmskResults = RepeatMasker(warmupComplete, batchChan, lib, libOpt, species, twoBitFile, ucscToolsDir, repeatMaskerDir, adjCoordinates, otherOptions) | flatten
 
@@ -387,36 +377,36 @@ workflow {
       rmskAlignChan: it.name.contains(".align")
       rmskOutChan: it.name.contains(".out")
     }
-    .set{ rmskBranchedResults }
+    .set { rmskBranchedResults }
 
-  def outputDirCh        = Channel.value(outputDir)
-  def ucscToolsDirCh     = Channel.value(ucscToolsDir)
-  def repeatMaskerDirCh  = Channel.value(repeatMaskerDir)
+  def outputDirCh = Channel.value(outputDir)
+  def ucscToolsDirCh = Channel.value(ucscToolsDir)
+  def repeatMaskerDirCh = Channel.value(repeatMaskerDir)
 
-  translationFile = rmskBranchedResults.rmskOutChan \
-    | collectFile(name: "combOut") \
-    | combine(twoBitFile) \
-    | combine(outputDirCh) \
-    | combine(ucscToolsDirCh) \
-    | combine(repeatMaskerDirCh) \
-    | combineRMOUTOutput \
-    | first \
-    | map { v -> v[2] } 
+  translationFile = rmskBranchedResults.rmskOutChan
+    | collectFile(name: "combOut")
+    | combine(twoBitFile)
+    | combine(outputDirCh)
+    | combine(ucscToolsDirCh)
+    | combine(repeatMaskerDirCh)
+    | combineRMOUTOutput
+    | first
+    | map { v -> v[2] }
 
 
-  combAlignFile = rmskBranchedResults.rmskAlignChan \
-    | collectFile(name: "combAlign") 
+  combAlignFile = rmskBranchedResults.rmskAlignChan
+    | collectFile(name: "combAlign")
 
   combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
 
   workflow.onComplete = {
-    log.info "Pipeline execution summary"
-    log.info "---------------------------"
-    log.info "Completed at : ${workflow.complete}"
-    log.info "Duration     : ${workflow.duration}"
-    log.info "Success      : ${workflow.success}"
-    log.info "workDir      : ${workflow.workDir}"
-    log.info "exit status  : ${workflow.exitStatus}"
-    log.info "Error report : ${workflow.errorReport ?: '-'}"
+    log.info("Pipeline execution summary")
+    log.info("---------------------------")
+    log.info("Completed at : ${workflow.complete}")
+    log.info("Duration     : ${workflow.duration}")
+    log.info("Success      : ${workflow.success}")
+    log.info("workDir      : ${workflow.workDir}")
+    log.info("exit status  : ${workflow.exitStatus}")
+    log.info("Error report : ${workflow.errorReport ?: '-'}")
   }
 }
