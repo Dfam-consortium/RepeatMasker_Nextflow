@@ -5,20 +5,20 @@ vim: syntax=groovy
 RepeatMasker_Nextflow : Run RepeatMasker on a cluster using Nextflow (DSL2)
 
  Parameters:
+    Required:
+      - profile        : Which profile to use from the config
+     --inputSequence   : FASTA file optionally compressed with gzip.
+     --assembly        : Metadata value
+     --species         : Dfam species library ( or use inputLibrary for custom lib ) 
+     --inputLibrary    : Uncompressed FASTA file containing consensi. ( or use species )
 
-     --species         : Dfam species library ( or use inputLibrary for custom lib )
+    Optional:
      --nolow           : Use RepeatMasker '-nolow' option.  Not recommended under normal
                          circumstances.  Gives a major boost to false positives.
      --xsmall          : Use RepeatMasker '-xsmall' option.
      --s               : Use RepeatMasker -s option -- not a big impact for RMBlast.
-     --inputSequence   : FASTA file optionally compressed with gzip.
-     --inputLibrary    : Uncompressed FASTA file containing consensi.
-     --outputDir       : Directory to store the results.  Should already exist.
      --engine          : Specify engine to use [ default: rmblast ]
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
-     --cpus            : Number of cpus to use per batch job [ default: 12 ]
-     --cluster         : Either "local", "quanah", "nocona" or "ua"
-     --assembly        : Metadata value
      --repbase_ver     : Metadata value
  
  Examples:
