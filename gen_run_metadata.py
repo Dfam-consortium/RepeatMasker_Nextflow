@@ -13,6 +13,7 @@ def main(*args):
     parser.add_argument("-r", "--rep_base", required=True)
     parser.add_argument("-g", "--algorithm", required=True)
     parser.add_argument("-c", "--rmsk_commands", required=True)
+    parser.add_argument("-d", "--rmsk_dir", required=True)
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-s", "--species")
@@ -20,10 +21,9 @@ def main(*args):
 
     args = parser.parse_args()
 
-    rep_masker_dir = "/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
-    famdb_py = os.path.join(rep_masker_dir, "famdb.py")
-    famdb_lib = os.path.join(rep_masker_dir, "Libraries/famdb")
-    rep_masker = os.path.join(rep_masker_dir, "RepeatMasker")
+    famdb_py = os.path.join(args.rmsk_dir, "famdb.py")
+    famdb_lib = os.path.join(args.rmsk_dir, "Libraries/famdb")
+    rep_masker = os.path.join(args.rmsk_dir, "RepeatMasker")
 
     metadata = {
         "assembly": args.assembly_accession,

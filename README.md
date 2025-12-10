@@ -24,12 +24,38 @@
  - Detailed FamDB installation instructions can be found on the README at https://github.com/Dfam-consortium/TETools
  - Note that the public version of TETools does not contain Crossmatch
  - `dfam-tetools.def` can be extended to add any other tools needed 
-3. Write a profile in nextflow.config
+3. Write a profile in nextflow.config. See example below.
 4. Write a SLURM script and submit the job
+  - example: 
+  ```
+  #!/bin/bash
+  # --------------------
+  ### Directives Section
+  # --------------------
+  #SBATCH --job-name=<name>
+  #SBATCH --account=<pi account>
+  #SBATCH --partition=standard
+  #SBATCH --nodes=1
+  #SBATCH --ntasks=1
+  #SBATCH --cpus-per-task=1
+  #SBATCH --time=24:00:00
+  # --------------------
+  ### Code Section
+  # --------------------
+
+  genome_file=<path to genome>.fa.gz
+  species=<species>
+  assembly=<assembly name>
+
+  (
+    cd <personal dir> &&
+    ~/nextflow ./RepeatMasker_Nextflow/RepeatMasker_Nextflow.nf -profile <profile name> --species $species --inputSequence $genome_file --assembly $assembly 
+  )
+  ```
 
 **Parameters:**
-
-  Parameters:
+  ```
+  Run Parameters:
     Required:
       - profile        : Which profile to use from the config
      --inputSequence   : FASTA file optionally compressed with gzip.
@@ -45,6 +71,30 @@
      --engine          : Specify engine to use [ default: rmblast ]
      --batchSize       : Size of each cluster job in bp [ default: 50mb ]
      --repbase_ver     : Metadata value
+  ```
+  ```
+  Config Parameters
+    - apptainer.enabled       : True of False, to use a container
+    - apptainer.autoMounts    : True of False, to use a container
+    - apptainer.runOptions    : Container options, usually to bind in 
+
+    - process.container       : Path to the container if used
+    - process.executor        : Executor name, ie slurm
+    - process.clusterOptions  : Exectutor options: account, notes, tasks
+    - process.queue           : Executor queue
+    - process.memory          : Memory allocation for each child process
+    - process.errorStrategy   : Behavior for when a child process errors. 
+                                Should usually be "finish"
+
+    - params.outputDir        : Path to dir for output files
+    - params.cpus             : CPU allocation for each child process
+    - params.thisAdjOptions   : 
+    - params.thisScratch      : 
+    - params.ucscToolsDir     : Path to dir with UCSC tools. 
+                                If using a container, should be within the container
+    - params.repeatMaskerDir  : Path to dir with RepeatMasker. 
+                                If using a container, should be within the container
+  ```
 
 **Configuration**
 
@@ -55,7 +105,6 @@
       your_profile {
   
           // boilerplate
-          params.cluster = your_profile // should be the same as the profile name
           params.thisExecutor = "slurm"
           params.thisQueue = 
           params.thisOptions = // PI account details
@@ -96,15 +145,12 @@
     nextflow /path/RepeatMasker_Nextflow.nf -profile <profile> \
                     --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
                     --species "human" \
-                    --cluster nocona
 
   o Run with a custom library:
 
     nextflow /path/RepeatMasker_Nextflow.nf -profile <profile> \
                     --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
                     --inputLibrary /full_path_required/GCA_003113815.1-consensi.fa \
-                    --cluster griz
-
 
 Robert Hubley, 2020-2024
 

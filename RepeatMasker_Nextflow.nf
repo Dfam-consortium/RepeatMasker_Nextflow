@@ -78,7 +78,7 @@ process generate_metadata {
 
   script:
   """
-  python3 ${metadataScript} -a ${assembly} -${key} -r ${repbase_ver} -g ${algorithm} -c "${otherOptions} ${lib}"
+  python3 ${metadataScript} -a ${assembly} -${key} -r ${repbase_ver} -d ${params.repeatMaskerDir} -g ${algorithm} -c "${otherOptions} ${lib}"
   """
 }
 
@@ -356,7 +356,7 @@ workflow {
   log.info("RepeatMaskerDir     : " + repeatMaskerDir)
   log.info("UCSCToolsDir        : " + ucscToolsDir)
   log.info("Output Directory    : " + outputDir)
-  log.info("Cluster             : " + params.cluster)
+  log.info("Cluster             : " + workflow.profile)
   log.info("Queue/Partititon    : " + thisQueue)
   log.info("Batch size          : " + batchSize)
   log.info("Max cpus per task   : " + max_cpus)
