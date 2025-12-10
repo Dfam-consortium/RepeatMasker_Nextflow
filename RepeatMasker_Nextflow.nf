@@ -69,6 +69,9 @@ process generate_metadata {
   val otherOptions
   val key
   val lib
+  path libOpt
+  // this needs to be here to ensure that the library file is accessible in the work dir
+
 
   output:
   path "${assembly}_${algorithm}-run_data.json"
@@ -302,7 +305,7 @@ workflow {
     libOpt = Channel.value(libOpt)
   }
   else {
-    libOpt = Channel.empty()
+    libOpt = Channel.value([])
   }
 
   def otherOptions = ""
@@ -358,7 +361,7 @@ workflow {
   def algorithm = params.engine ?: "rmblast"
   def metadataFile = file("${workflow.projectDir}/gen_run_metadata.py")
   def key = species ?: lib
-  generate_metadata(metadataFile, outputDir, assembly, repbase_ver, algorithm, otherOptions, key, lib)
+  generate_metadata(metadataFile, outputDir, assembly, repbase_ver, algorithm, otherOptions, key, lib, libOpt)
 
   def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
   warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions, species)

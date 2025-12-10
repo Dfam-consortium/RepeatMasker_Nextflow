@@ -4,6 +4,7 @@ import sys
 import subprocess
 from datetime import datetime
 import os
+import hashlib
 
 
 def main(*args):
@@ -12,7 +13,7 @@ def main(*args):
     parser.add_argument("-r", "--rep_base", required=True)
     parser.add_argument("-g", "--algorithm", required=True)
     parser.add_argument("-c", "--rmsk_commands", required=True)
-    
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-s", "--species")
     group.add_argument("-l", "--lib")
@@ -33,6 +34,10 @@ def main(*args):
     }
 
     if args.species:
+        metadata["lib_sequence_count"] = None
+        metadata["lib_md5"] = None
+        metadata["lib_base_ct"] = None
+
         # FamDB Names Command
         names_result = subprocess.run(
             [
@@ -102,13 +107,31 @@ def main(*args):
                 metadata["dfam_ver"] = line.strip().split(" ")[-1]
 
     elif args.lib:
-        metadata["tax_id"] = 'placeholder'
-        metadata["species"] = 'placeholder'
-        metadata["ancestral_fams"] = 'placeholder'
-        metadata["specific_fams"] = 'placeholder'
-        metadata["famdb_ver"] = 'placeholder'
-        metadata["dfam_ver"] = 'placeholder'
+        metadata["tax_id"] = None
+        metadata["species"] = None
+        metadata["ancestral_fams"] = None
+        metadata["specific_fams"] = None
+        metadata["famdb_ver"] = None
+        metadata["dfam_ver"] = None
 
+        try:
+            with open(args.lib, "r") as file:
+                libfile = file.read()
+            metadata["lib_sequence_count"] = libfile.count(">")
+
+            metadata["lib_md5"] = hashlib.md5(open(args.lib, "rb").read()).hexdigest()
+
+            lines = libfile.split("\n")
+            nucleotides = {"A", "T", "C", "G"}
+            base_count = 0
+            for line in lines:
+                sline = line.strip()
+                if set(sline).issubset(nucleotides):
+                    base_count += len(sline)
+            metadata["lib_base_ct"] = base_count
+
+        except Exception as e:
+            print(f"Couldn't Open {args.lib}, {e}")
 
     # RepeatMasker Version Command
     rm_result = subprocess.run(
@@ -131,6 +154,9 @@ def main(*args):
         "ancestral_fams",
         "specific_fams",
         "rmsk_ver",
+        "lib_sequence_count",
+        "lib_md5",
+        "lib_base_ct",
     ]
     missing = []
     for element in element_check:
@@ -141,6 +167,8 @@ def main(*args):
         print(f"Missing metadata elements: {missing}")
         exit(1)
 
+    metadata["public"] = True
+    metadata["path"] = None
     with open(
         f"{metadata['assembly']}_{metadata['algorithm']}-run_data.json", "w"
     ) as file:
