@@ -20,7 +20,7 @@ def main(*args):
 
     args = parser.parse_args()
 
-    rep_masker_dir = "/opt/RepeatMasker"
+    rep_masker_dir = "/lustre/work/daray/software/RepeatMasker-4.1.2-p1"
     famdb_py = os.path.join(rep_masker_dir, "famdb.py")
     famdb_lib = os.path.join(rep_masker_dir, "Libraries/famdb")
     rep_masker = os.path.join(rep_masker_dir, "RepeatMasker")

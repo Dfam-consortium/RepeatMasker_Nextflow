@@ -271,7 +271,12 @@ workflow {
   }
 
   //  HPC Parameters
-  def proc = params.cpus ?: 12
+  def max_cpus = params.cpus ?: 12
+  if (max_cpus < 2 ) {
+    log.warn "Requested CPUs (${max_cpus}) < 2; forcing to 2 so RepeatMasker can use -pa 1 safely."
+    max_cpus = 2
+  }
+
   def inputSequence = params.inputSequence ?: null
   def outputDir = params.outputDir ?: workflow.launchDir
 
@@ -308,21 +313,28 @@ workflow {
     libOpt = Channel.value([])
   }
 
-  def otherOptions = ""
-  def cpus_per_pa = 1
-  def engine = params.engine ?: null
-  if (engine != null) {
-    if (engine == "hmmer") {
-      // Number of cpus needed per -pa increment with nhmmer
-      cpus_per_pa = 2
-    }
-    otherOptions += " -engine " + engine + " -pa " + proc.intdiv(cpus_per_pa)
+  String engine = params.engine ?: 'rmblast'
+  int aligner_threads
+
+  switch (engine) {
+    case 'hmmer':
+      aligner_threads = 2
+      break
+    case 'crossmatch':
+      aligner_threads = 1
+      break
+    case 'rmblast':
+      aligner_threads = 4
+      break
+    default:
+      error("Could not identify search engine ${engine}!")
+      break
   }
-  else {
-    // Number of cpus needed per -pa increment with rmblast
-    cpus_per_pa = 4
-    otherOptions += " -engine rmblast" + " -pa " + proc.intdiv(cpus_per_pa)
-  }
+  // Choose -pa so that (aligner_threads * pa) + 1 <= max_cpus
+  int pa = (int) ((max_cpus - 1).intdiv(aligner_threads))
+  if (pa < 1 ) pa = 1
+ 
+  def otherOptions = " -engine ${engine} -pa ${pa}"
 
   def nolow = params.nolow ?: null
   if (nolow != null) {
@@ -347,6 +359,7 @@ workflow {
   log.info("Cluster             : " + params.cluster)
   log.info("Queue/Partititon    : " + thisQueue)
   log.info("Batch size          : " + batchSize)
+  log.info("Max cpus per task   : " + max_cpus)
   log.info("RepeatMasker Options: " + otherOptions)
   log.info("Input Sequence      : " + inputSequence)
   if (inputLibrary != null) {
@@ -355,7 +368,7 @@ workflow {
   if (params.species != null) {
     log.info("Species             : " + species)
   }
-  log.info("CPUs Per Task       : " + proc)
+  //log.info("CPUs Per Task       : " + proc)
   log.info("\n")
 
   def algorithm = params.engine ?: "rmblast"
