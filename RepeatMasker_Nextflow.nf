@@ -302,7 +302,9 @@ workflow {
       break
   }
   // Choose -pa so that (aligner_threads * pa) + 1 <= max_cpus
-  int pa = (int) ((max_cpus - 1).intdiv(aligner_threads))
+  //int pa = (int) ((max_cpus - 1).intdiv(aligner_threads))
+  // Choose -pa so that (aligner_threads * pa) <= max_cpus
+  int pa = (int) ((max_cpus).intdiv(aligner_threads))
   if (pa < 1 ) pa = 1
  
   def otherOptions = " -engine ${engine} -pa ${pa}"
