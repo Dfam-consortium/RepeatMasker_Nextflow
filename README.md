@@ -59,11 +59,15 @@
     Required:
       - profile        : Which profile to use from the config
      --inputSequence   : FASTA file optionally compressed with gzip.
-     --assembly        : Metadata value
+
      --species         : Dfam species library ( or use inputLibrary for custom lib ) 
+     or
      --inputLibrary    : Uncompressed FASTA file containing consensi. ( or use species )
 
     Optional:
+     --outputDir       : Directory for output folder [ default: current working directory ]
+     --assembly        : The name of the assembly [ default: derived from inputSequence filename ]
+                            This will be used to generate the output folder name ( <outputDir>/<assembly>/ ).
      --nolow           : Use RepeatMasker '-nolow' option.  Not recommended under normal
                          circumstances.  Gives a major boost to false positives.
      --xsmall          : Use RepeatMasker '-xsmall' option.

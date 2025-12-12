@@ -4,51 +4,10 @@ vim: syntax=groovy
 
 RepeatMasker_Nextflow : Run RepeatMasker on a cluster using Nextflow (DSL2)
 
- Parameters:
-    Required:
-      - profile        : Which profile to use from the config
-     --inputSequence   : FASTA file optionally compressed with gzip.
-     --assembly        : Metadata value
-     --species         : Dfam species library ( or use inputLibrary for custom lib ) 
-     --inputLibrary    : Uncompressed FASTA file containing consensi. ( or use species )
-
-    Optional:
-     --nolow           : Use RepeatMasker '-nolow' option.  Not recommended under normal
-                         circumstances.  Gives a major boost to false positives.
-     --xsmall          : Use RepeatMasker '-xsmall' option.
-     --s               : Use RepeatMasker -s option -- not a big impact for RMBlast.
-     --engine          : Specify engine to use [ default: rmblast ]
-     --batchSize       : Size of each cluster job in bp [ default: 50mb ]
-     --repbase_ver     : Metadata value
- 
- Examples:
-
-  NOTE: On some clusters it will be necessary to use full paths to
-        all files specified as parameters.
-
-  o Run with standard libraries and a specified species:
-   
-    nextflow run /path/RepeatMasker_Nextflow.nf \
-                    --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
-                    --species "human" \
-                    --cluster nocona
-
-  
-  o Run with a custom library:
-
-    nextflow run /path/RepeatMasker_Nextflow.nf \
-                    --inputSequence /full_path_required/GCA_003113815.1.fna.gz \
-                    --inputLibrary /full_path_required/GCA_003113815.1-consensi.fa \
-                    --cluster griz
-
+See README.md for full description of parameters and example usage.
 
 Robert Hubley, 2020-2025
 */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-/////// CUSTOMIZE CLUSTER ENVIRONMENT HERE BY ADDING YOUR OWN PROFILE TO nextflow.config
-/////// USE '-profile local' TO RUN ON THE CURRENT MACHINE
-//////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 process generate_metadata {
@@ -62,7 +21,7 @@ process generate_metadata {
 
   input:
   path metadataScript
-  path outputDir
+  val outputDir
   val assembly
   val repbase_ver
   val algorithm
@@ -107,27 +66,32 @@ process warmupRepeatMasker {
 
 
 process genTwoBitFile {
+
   input:
   path inSeqFile
-  val ucscToolsDir
+  val  ucscToolsDir
 
   output:
-  path '*.2bit'
+  path "${inSeqFile.simpleName}.2bit"
 
   script:
   """
-  # Generate 2bit files if necessary
-  if [ ${inSeqFile.extension} == "gz" ]; then
-    gunzip -c ${inSeqFile} | ${ucscToolsDir}/faToTwoBit -long stdin ${inSeqFile.baseName}.2bit
-  elif [ ${inSeqFile.extension} == "2bit" ]; then
-    # renaming the link includes it in the output. Nextflow seems to exclude inputs from the blobbed output
-    mv ${inSeqFile} processed.${inSeqFile}
+  set -euo pipefail
+
+  BASE="${inSeqFile.simpleName}"
+
+  if [ "${inSeqFile.extension}" = "gz" ]; then
+    gunzip -c ${inSeqFile} | ${ucscToolsDir}/faToTwoBit -long stdin "\${BASE}.2bit"
+
+  elif [ "${inSeqFile.extension}" = "2bit" ]; then
+    # Must create a NEW file so Nextflow emits it as output
+    cp ${inSeqFile} "\${BASE}.2bit"
+
   else
-    ${ucscToolsDir}/faToTwoBit -long ${inSeqFile} processed.${inSeqFile.baseName}.2bit
-  fi  
+    ${ucscToolsDir}/faToTwoBit -long ${inSeqFile} "\${BASE}.2bit"
+  fi
   """
 }
-
 
 process genBatches {
   input:
@@ -186,7 +150,7 @@ process RepeatMasker {
 
 process combineRMOUTOutput {
 
-  publishDir path: "${outputDir}/${params.assembly}", mode: 'copy', saveAs: { f ->
+  publishDir path: "${outputDir}/${assembly}", mode: 'copy', saveAs: { f ->
     def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
     def base = file(twoBitFile).baseName
     if (fname.endsWith(".rmout.gz")) {
@@ -199,7 +163,7 @@ process combineRMOUTOutput {
   }
 
   input:
-  tuple path(combinedFile), path(twoBitFile), path(outputDir), val(ucscToolsDir), val(repeatMaskerDir)
+  tuple path(combinedFile), path(twoBitFile), val(outputDir), val(assembly), val(ucscToolsDir), val(repeatMaskerDir)
 
   output:
   tuple path('*.rmout.gz'), path('*.summary'), path('combOutSorted-translation.tsv')
@@ -220,7 +184,7 @@ process combineRMOUTOutput {
 
 process combineRMAlignOutput {
 
-  publishDir path: "${outputDir}/${params.assembly}", mode: 'copy', saveAs: { f ->
+  publishDir path: "${outputDir}/${assembly}", mode: 'copy', saveAs: { f ->
     def fname = f instanceof java.nio.file.Path ? f.getFileName().toString() : f.toString().split('/').last()
     def base = file(twoBitFile).baseName
     if (fname.endsWith('.rmalign.gz')) {
@@ -233,7 +197,8 @@ process combineRMAlignOutput {
   path translationFile
   path combinedFile
   path twoBitFile
-  path outputDir
+  val outputDir
+  val assembly
   val ucscToolsDir
   val repeatMaskerDir
 
@@ -263,12 +228,7 @@ workflow {
   version = "3.0"
 
   // meta params
-  def assembly = params.assembly ?: null
   def repbase_ver = params.repbase_ver ?: 'null'
-
-  if (!assembly) {
-    error("Please provide an assembly accession with --assembly for this run.")
-  }
 
   //  HPC Parameters
   def max_cpus = params.cpus ?: 12
@@ -278,10 +238,21 @@ workflow {
   }
 
   def inputSequence = params.inputSequence ?: null
+  if (!inputSequence) {
+    error("Please provide an input sequence with --inputSequence")
+  }
+
+  def assembly
+  if (params.assembly) {
+    assembly = params.assembly
+  }
+  else {
+    assembly = file(inputSequence).simpleName
+  }
+
   def outputDir = params.outputDir ?: workflow.launchDir
 
   // def thisExecutor =    params.thisExecutor
-  def thisQueue = params.thisQueue
   def ucscToolsDir = params.ucscToolsDir
   def repeatMaskerDir = params.repeatMaskerDir
   def batchSize = params.batchSize ?: 50000000
@@ -352,21 +323,22 @@ workflow {
   // Print out the configuration
   log.info("RepeatMasker_Nextflow : RepeatMasker Cluster Runner ver " + version)
   log.info("====================================================================")
-  log.info("working directory   : " + workflow.workDir)
-  log.info("RepeatMaskerDir     : " + repeatMaskerDir)
-  log.info("UCSCToolsDir        : " + ucscToolsDir)
-  log.info("Output Directory    : " + outputDir)
-  log.info("Cluster             : " + workflow.profile)
-  log.info("Queue/Partititon    : " + thisQueue)
-  log.info("Batch size          : " + batchSize)
-  log.info("Max cpus per task   : " + max_cpus)
-  log.info("RepeatMasker Options: " + otherOptions)
-  log.info("Input Sequence      : " + inputSequence)
+  log.info("Working directory      : " + workflow.workDir)
+  log.info("RepeatMasker directory : " + repeatMaskerDir)
+  log.info("UCSCTools directory    : " + ucscToolsDir)
+  log.info("Output directory       : " + outputDir)
+  log.info("Cluster                : " + workflow.profile)
+  def q = session.config.process.queue ?: "default"
+  log.info("Queue/Partititon       : " + q)
+  log.info("Batch size             : " + batchSize)
+  log.info("Max cpus per task      : " + max_cpus)
+  log.info("RepeatMasker options   : " + otherOptions)
+  log.info("Input sequence         : " + inputSequence)
   if (inputLibrary != null) {
-    log.info("Library File        : " + inputLibrary)
+    log.info("Library file           : " + inputLibrary)
   }
   if (params.species != null) {
-    log.info("Species             : " + species)
+    log.info("Species                : " + species)
   }
   //log.info("CPUs Per Task       : " + proc)
   log.info("\n")
@@ -398,11 +370,13 @@ workflow {
   def outputDirCh = Channel.value(outputDir)
   def ucscToolsDirCh = Channel.value(ucscToolsDir)
   def repeatMaskerDirCh = Channel.value(repeatMaskerDir)
+  def assemblyCh = Channel.value(assembly)
 
   translationFile = rmskBranchedResults.rmskOutChan
     | collectFile(name: "combOut")
     | combine(twoBitFile)
     | combine(outputDirCh)
+    | combine(assemblyCh)
     | combine(ucscToolsDirCh)
     | combine(repeatMaskerDirCh)
     | combineRMOUTOutput
@@ -413,7 +387,7 @@ workflow {
   combAlignFile = rmskBranchedResults.rmskAlignChan
     | collectFile(name: "combAlign")
 
-  combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, ucscToolsDir, repeatMaskerDir)
+  combineRMAlignOutput(translationFile, combAlignFile, twoBitFile, outputDir, assembly, ucscToolsDir, repeatMaskerDir)
 
   workflow.onComplete = {
     log.info("Pipeline execution summary")
