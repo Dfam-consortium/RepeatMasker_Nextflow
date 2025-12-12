@@ -241,6 +241,7 @@ workflow {
   if (!inputSequence) {
     error("Please provide an input sequence with --inputSequence")
   }
+  def inputSequenceFile = file(inputSequence)
 
   def assembly
   if (params.assembly) {
@@ -353,7 +354,7 @@ workflow {
   def small_seq = file("${workflow.projectDir}/sample/small-seq.fa")
   warmupComplete = warmupRepeatMasker(small_seq, repeatMaskerDir, otherOptions, species)
 
-  twoBitFile = genTwoBitFile(inputSequence, ucscToolsDir)
+  twoBitFile = genTwoBitFile(inputSequenceFile, ucscToolsDir)
 
   def genBEDBatches = file("${workflow.projectDir}/genBEDBatches.pl")
   batchChan = genBatches(twoBitFile, batchSize, ucscToolsDir, genBEDBatches) | flatten
