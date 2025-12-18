@@ -56,11 +56,18 @@ process warmupRepeatMasker {
   """
   #
   # Run RepeatMasker with "-species" option on a small sequence in order to
-  # force it to initialize the cached libraries.  Do not want to do this on the
-  # cluster ( in parallel ) as it may cause each job to attempt the build at once.
-  #
-  # hostname > node
-  ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${species} ${small_seq.baseName}.fa >& ${small_seq.baseName}.rmlog
+  # force it to initialize the cached libraries.  This avoids the race condition
+  # that happens when many jobs of the same species are started up at once on a 
+  # cluster.
+  log=${small_seq.baseName}.rmlog
+  ${repeatMaskerDir}/RepeatMasker ${otherOptions} ${species} ${small_seq.baseName}.fa \
+      >& $log || { 
+        echo "Warmup RepeatMasker run failed"
+        echo "------- Wamrup Log -------"
+        cat $log
+        echo "-------------------------"
+        exit 1
+      }
   """
 }
 
