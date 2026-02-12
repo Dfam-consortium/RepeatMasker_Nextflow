@@ -67,9 +67,9 @@
     Optional:
      --outputDir       : Directory for output folder [ default: current working directory ]
      --assembly        : The name of the assembly [ default: derived from inputSequence filename ]
-                            This will be used to generate the output folder name ( <outputDir>/<assembly>/ ).
+                          This will be used to generate the output folder name ( <outputDir>/<assembly>/ ).
      --nolow           : Use RepeatMasker '-nolow' option.  Not recommended under normal
-                         circumstances.  Gives a major boost to false positives.
+                          circumstances.  Gives a major boost to false positives.
      --xsmall          : Use RepeatMasker '-xsmall' option.
      --s               : Use RepeatMasker -s option -- not a big impact for RMBlast.
      --engine          : Specify engine to use [ default: rmblast ]
@@ -78,9 +78,9 @@
   ```
   ```
   Config Parameters
-    - apptainer.enabled       : True of False, to use a container
-    - apptainer.autoMounts    : True of False, to use a container
-    - apptainer.runOptions    : Container options, usually to bind in 
+    - apptainer.enabled       : True or False, to use a container
+    - apptainer.autoMounts    : True or False, to use a container
+    - apptainer.runOptions    : Container options, usually to bind in the FamDB directory
 
     - process.container       : Path to the container if used
     - process.executor        : Executor name, ie slurm
@@ -92,8 +92,6 @@
 
     - params.outputDir        : Path to dir for output files
     - params.cpus             : CPU allocation for each child process
-    - params.thisAdjOptions   : 
-    - params.thisScratch      : 
     - params.ucscToolsDir     : Path to dir with UCSC tools. 
                                 If using a container, should be within the container
     - params.repeatMaskerDir  : Path to dir with RepeatMasker. 
@@ -110,10 +108,6 @@
   
           // boilerplate
           params.thisExecutor = "slurm"
-          params.thisQueue = 
-          params.thisOptions = // PI account details
-          params.thisAdjOptions = 
-          params.thisScratch = 
           params.cpus = 12
 
           // Directory to find twoBitToFa, faToTwoBit, and bedSort utilities
